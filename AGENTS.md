@@ -109,3 +109,18 @@ Fabric REST APIs: https://learn.microsoft.com/en-us/rest/api/fabric/articles/
 - SELECT * on large tables without LIMIT
 - Unbounded streaming queries
 - Complex calculated columns in Semantic Models (use measures)
+
+## Cursor Cloud specific instructions
+
+This repository is a content/skills package (Markdown skills, agents, and plugin
+manifests) — there is nothing to build or serve, so the startup update script installs
+nothing for it.
+
+- **No test suite on `main`.** `package.json` declares `pytest` scripts and a
+  `tests/coverage_gap_report.py`, but the `tests/` directory (and any Python deps) are not
+  present on this branch. Do not expect `npm test` / `pytest` to run here; if a task needs
+  them, the tests must be added first.
+- The Fabric operations described in the skills require Azure AD auth (`az login`) and a
+  live Fabric tenant, which are not available in the cloud VM — treat those flows as
+  documentation, not runnable here.
+- Validate changes by reviewing the Markdown skill/agent content directly.
