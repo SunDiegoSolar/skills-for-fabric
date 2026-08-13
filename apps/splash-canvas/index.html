@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0c10" />
+  <title>Splash Canvas</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="stage">
+    <div id="bg" class="bg-aurora" aria-hidden="true"></div>
+    <div id="dim" aria-hidden="true"></div>
+    <div id="widgets"></div>
+    <div id="drop-hint" hidden>Drop photos or a video to set the background</div>
+  </div>
+
+  <aside id="inspector" class="panel" hidden>
+    <header>
+      <strong id="inspector-title">Widget</strong>
+      <button type="button" class="icon-btn" id="inspector-close" title="Close">✕</button>
+    </header>
+    <div id="inspector-body"></div>
+    <footer>
+      <button type="button" class="ghost danger" id="delete-widget">Delete</button>
+      <button type="button" class="ghost" id="duplicate-widget">Duplicate</button>
+    </footer>
+  </aside>
+
+  <div id="bg-panel" class="panel" hidden>
+    <header>
+      <strong>Background</strong>
+      <button type="button" class="icon-btn" id="bg-panel-close" title="Close">✕</button>
+    </header>
+    <label>Style
+      <select id="bg-mode">
+        <option value="aurora">Aurora (animated)</option>
+        <option value="dusk">Dusk gradient</option>
+        <option value="noir">Noir</option>
+        <option value="photo">Local photos</option>
+        <option value="video">Local video</option>
+        <option value="online">Random photos (no API key)</option>
+      </select>
+    </label>
+    <label>Dim overlay
+      <input id="bg-dim" type="range" min="0" max="70" value="28" />
+    </label>
+    <label class="check">
+      <input id="bg-kenburns" type="checkbox" checked />
+      Slow pan / zoom on photos
+    </label>
+    <label>Slideshow interval (seconds)
+      <input id="bg-interval" type="number" min="8" max="300" value="45" />
+    </label>
+    <div class="row">
+      <button type="button" id="pick-bg">Choose files…</button>
+      <button type="button" class="ghost" id="clear-bg-files">Clear files</button>
+    </div>
+    <p class="hint">Drop images or a muted video onto the screen. Files stay on this computer (this browser’s storage). No Unsplash key required.</p>
+  </div>
+
+  <div id="add-menu" class="menu" hidden>
+    <button type="button" data-add="clock">Clock</button>
+    <button type="button" data-add="date">Date</button>
+    <button type="button" data-add="text">Text</button>
+    <button type="button" data-add="image">Image</button>
+    <button type="button" data-add="weather">Weather</button>
+    <button type="button" data-add="quote">Quote</button>
+    <button type="button" data-add="note">Note</button>
+  </div>
+
+  <nav id="chrome" aria-label="Splash controls">
+    <div class="left">
+      <span class="brand">Splash Canvas</span>
+      <span class="mode-pill" id="mode-pill">Edit</span>
+    </div>
+    <div class="center">
+      <button type="button" id="toggle-edit">Present</button>
+      <button type="button" id="open-bg">Background</button>
+      <button type="button" id="open-add">Add</button>
+      <button type="button" class="ghost" id="reset-layout">Reset</button>
+    </div>
+    <div class="right">
+      <button type="button" class="ghost" id="export-layout">Export</button>
+      <button type="button" class="ghost" id="import-layout">Import</button>
+      <button type="button" id="fullscreen">Fullscreen</button>
+    </div>
+  </nav>
+
+  <input id="file-bg" type="file" accept="image/*,video/*" multiple hidden />
+  <input id="file-widget" type="file" accept="image/*" hidden />
+  <input id="file-import" type="file" accept="application/json" hidden />
+
+  <div id="help" hidden>
+    <div class="help-card">
+      <h2>What you can do</h2>
+      <ul>
+        <li><kbd>F</kbd> fullscreen · <kbd>E</kbd> edit/present · <kbd>?</kbd> this guide · <kbd>Esc</kbd> present</li>
+        <li>Drop photos or a video onto the screen for a local dynamic background</li>
+        <li>Add clock, date, text, images, weather, quotes, and notes — then drag and resize them</li>
+        <li>Weather uses Open-Meteo (no API key). Random photos use Lorem Picsum (no API key)</li>
+        <li>Layout is saved in this browser. Export JSON to back it up</li>
+      </ul>
+      <button type="button" id="help-close">Got it</button>
+    </div>
+  </div>
+
+  <div id="toast" hidden></div>
+  <script src="./app.js"></script>
+</body>
+</html>

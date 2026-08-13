@@ -1,0 +1,9 @@
+{
+  "name": "Splash Canvas",
+  "short_name": "Splash",
+  "display": "fullscreen",
+  "background_color": "#0b0c10",
+  "theme_color": "#0b0c10",
+  "start_url": "./index.html",
+  "description": "Local fullscreen canvas with dynamic backgrounds and addable overlays. No API key required."
+}
