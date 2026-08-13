@@ -2,8 +2,9 @@ export function makeTestPattern(size = 1024) {
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  const cells = 8;
+  canvas.dataset.splashPattern = "1";
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const cells = 16;
   const cell = size / cells;
   for (let y = 0; y < cells; y += 1) {
     for (let x = 0; x < cells; x += 1) {
@@ -11,7 +12,7 @@ export function makeTestPattern(size = 1024) {
       ctx.fillStyle = odd ? "#16202b" : "#e8c07a";
       ctx.fillRect(x * cell, y * cell, cell, cell);
       ctx.fillStyle = odd ? "#f4f1ea" : "#0b0c10";
-      ctx.font = `600 ${Math.floor(cell * 0.2)}px Outfit, sans-serif`;
+      ctx.font = `600 ${Math.floor(cell * 0.22)}px Outfit, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(`${x},${y}`, x * cell + cell / 2, y * cell + cell / 2);
@@ -32,5 +33,7 @@ export function makeTestPattern(size = 1024) {
   ctx.rotate(-Math.PI / 2);
   ctx.fillText("V →", 0, 0);
   ctx.restore();
+  canvas.style.cssText = "position:absolute;width:1px;height:1px;opacity:0;pointer-events:none";
+  document.body.appendChild(canvas);
   return canvas;
 }

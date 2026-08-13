@@ -108,7 +108,7 @@ h2 {
 }
 
 #face-list, #graph { display: flex; flex-direction: column; gap: 4px; }
-#face-list { max-height: 28vh; overflow: auto; }
+#face-list { max-height: 22vh; overflow: auto; }
 #face-list button { text-align: left; }
 #face-list .omitted { opacity: 0.45; text-decoration: line-through; }
 #graph { font-size: 12px; color: var(--muted); }

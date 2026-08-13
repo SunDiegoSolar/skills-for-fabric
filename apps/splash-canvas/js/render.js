@@ -110,6 +110,16 @@ export function createRenderer(canvas) {
   function setTexture(tex, source) {
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+    const isCanvas = source instanceof HTMLCanvasElement
+      || (typeof OffscreenCanvas !== "undefined" && source instanceof OffscreenCanvas);
+    if (isCanvas) {
+      const ctx2d = source.getContext("2d");
+      if (ctx2d) {
+        const img = ctx2d.getImageData(0, 0, source.width, source.height);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, img.width, img.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img.data);
+        return;
+      }
+    }
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
   }
 

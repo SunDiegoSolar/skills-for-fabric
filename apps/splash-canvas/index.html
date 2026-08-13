@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="Cache-Control" content="no-store" />
   <title>Splash Canvas — mapping studio</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c10'/%3E%3Ccircle cx='22' cy='24' r='10' fill='%23e8c07a'/%3E%3Ccircle cx='44' cy='40' r='12' fill='%235a90d0'/%3E%3C/svg%3E" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=3" />
 </head>
 <body data-mode="geometry">
   <header id="chrome">
@@ -38,13 +39,6 @@
     <aside id="side">
       <h2>Graph</h2>
       <div id="graph"></div>
-      <h2>Faces</h2>
-      <div id="face-list"></div>
-      <p class="muted" id="face-meta">No face selected</p>
-      <div class="row">
-        <button type="button" id="omit-face">Omit / restore face</button>
-      </div>
-      <label class="check"><input id="invert-faces" type="checkbox" /> Invert omitted faces</label>
 
       <h2>Media</h2>
       <label>Pin to
@@ -55,23 +49,6 @@
       </label>
       <div class="row">
         <button type="button" class="ghost" id="test-pattern">UV test pattern</button>
-      </div>
-
-      <h2>Selected face motion</h2>
-      <label>Animation
-        <select id="anim-dir">
-          <option value="off">Off</option>
-          <option value="u+">Move U →</option>
-          <option value="u-">Move U ←</option>
-          <option value="v+">Move V ↑</option>
-          <option value="v-">Move V ↓</option>
-        </select>
-      </label>
-      <label>Speed
-        <input id="anim-speed" type="range" min="0" max="40" value="8" />
-      </label>
-      <div class="row">
-        <button type="button" class="ghost" id="anim-all">Copy motion to all faces</button>
       </div>
 
       <h2>Black / mask / filter</h2>
@@ -97,6 +74,31 @@
         <button type="button" class="ghost" id="clear-mask">Clear mask</button>
         <button type="button" class="ghost" id="reset-warp">Reset warp grid</button>
       </div>
+
+      <h2>Faces</h2>
+      <div id="face-list"></div>
+      <p class="muted" id="face-meta">No face selected</p>
+      <div class="row">
+        <button type="button" id="omit-face">Omit / restore face</button>
+      </div>
+      <label class="check"><input id="invert-faces" type="checkbox" /> Invert omitted faces</label>
+
+      <h2>Selected face motion</h2>
+      <label>Animation
+        <select id="anim-dir">
+          <option value="off">Off</option>
+          <option value="u+">Move U →</option>
+          <option value="u-">Move U ←</option>
+          <option value="v+">Move V ↑</option>
+          <option value="v-">Move V ↓</option>
+        </select>
+      </label>
+      <label>Speed
+        <input id="anim-speed" type="range" min="0" max="40" value="8" />
+      </label>
+      <div class="row">
+        <button type="button" class="ghost" id="anim-all">Copy motion to all faces</button>
+      </div>
       <p class="muted">Keys: 1 geometry · 2 warp · 3 mask · 4 / F present · O omit · Ctrl/Cmd+Z undo · Esc hide chrome. Shift-drag on mask restores color.</p>
     </aside>
   </main>
@@ -104,6 +106,6 @@
   <input id="files" type="file" hidden multiple accept=".json,.obj,.png,.jpg,.jpeg,.webp,.gif,.mp4,.webm,.mov,image/*,video/*" />
   <input id="folder" type="file" hidden webkitdirectory directory />
   <div id="toast" hidden></div>
-  <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/app.js?v=3"></script>
 </body>
 </html>
