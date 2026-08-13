@@ -38,8 +38,8 @@ body.idle-cursor #chrome { opacity: 0; pointer-events: none; }
 }
 
 #bg {
-  background: #0b0c10;
   overflow: hidden;
+  background: #0b0c10;
 }
 
 #bg img, #bg video {
@@ -53,24 +53,61 @@ body.idle-cursor #chrome { opacity: 0; pointer-events: none; }
   animation: kenburns 48s ease-in-out infinite alternate;
 }
 
-.bg-aurora {
-  background:
-    radial-gradient(1200px 800px at 18% 22%, rgba(232, 192, 122, 0.38), transparent 58%),
-    radial-gradient(900px 700px at 82% 8%, rgba(92, 148, 210, 0.34), transparent 52%),
-    radial-gradient(800px 640px at 72% 86%, rgba(176, 78, 96, 0.28), transparent 50%),
-    radial-gradient(700px 500px at 8% 88%, rgba(80, 90, 70, 0.35), transparent 48%),
-    #0b0c10;
-  animation: drift 32s ease-in-out infinite alternate;
+#bg.bg-aurora {
+  background: #0b0c10;
 }
 
-.bg-dusk {
-  background:
-    linear-gradient(180deg, #1a2233 0%, #3a2a38 42%, #c47a4a 78%, #e8c07a 100%);
+#bg .blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.62;
+  animation: float 22s ease-in-out infinite alternate;
+  pointer-events: none;
 }
 
-.bg-noir {
+#bg .b1 {
+  width: 58vw;
+  height: 58vw;
+  left: -12%;
+  top: -22%;
+  background: #e8c07a;
+}
+
+#bg .b2 {
+  width: 48vw;
+  height: 48vw;
+  right: -14%;
+  top: -8%;
+  background: #5a90d0;
+  animation-delay: -7s;
+}
+
+#bg .b3 {
+  width: 52vw;
+  height: 52vw;
+  right: 8%;
+  bottom: -24%;
+  background: #b04e62;
+  animation-delay: -14s;
+}
+
+#bg .b4 {
+  width: 36vw;
+  height: 36vw;
+  left: 8%;
+  bottom: -10%;
+  background: #6d7a52;
+  animation-delay: -4s;
+}
+
+#bg.bg-dusk {
+  background: linear-gradient(180deg, #142033 0%, #3a2a3c 38%, #d4784a 76%, #f0c27a 100%);
+}
+
+#bg.bg-noir {
   background:
-    radial-gradient(900px 600px at 50% 0%, #2a2d36, #0b0c10 70%);
+    radial-gradient(900px 620px at 50% -10%, #3a3f4c, #0b0c10 72%);
 }
 
 #dim {
@@ -384,9 +421,9 @@ kbd {
   backdrop-filter: blur(16px);
 }
 
-@keyframes drift {
-  from { background-position: 0% 0%, 100% 0%, 80% 100%, 0% 100%, 0 0; }
-  to { background-position: 12% 8%, 88% 10%, 70% 90%, 8% 86%, 0 0; }
+@keyframes float {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(6%, 8%, 0) scale(1.12); }
 }
 
 @keyframes kenburns {

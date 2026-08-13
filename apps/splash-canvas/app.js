@@ -1,5 +1,5 @@
 (() => {
-  const STORAGE_KEY = "splash-canvas-layout-v1";
+  const STORAGE_KEY = "splash-canvas-layout-v2";
   const DB_NAME = "splash-canvas";
   const DEFAULT_CITY = "San Diego";
 
@@ -66,7 +66,7 @@
       helpSeen: false,
       background: {
         mode: "aurora",
-        dim: 28,
+        dim: 16,
         kenBurns: true,
         intervalSec: 45,
         assetIds: [],
@@ -278,7 +278,12 @@
     clearInterval(slideshowTimer);
     slideshowTimer = null;
 
-    if (bg.mode === "aurora" || bg.mode === "dusk" || bg.mode === "noir") {
+    if (bg.mode === "aurora") {
+      bgEl.classList.add("bg-aurora");
+      bgEl.innerHTML = '<i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i>';
+      return;
+    }
+    if (bg.mode === "dusk" || bg.mode === "noir") {
       bgEl.classList.add(`bg-${bg.mode}`);
       bgEl.innerHTML = "";
       return;
@@ -296,7 +301,7 @@
     const ids = bg.assetIds || [];
     if (!ids.length) {
       bgEl.classList.add("bg-aurora");
-      bgEl.innerHTML = "";
+      bgEl.innerHTML = '<i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i>';
       toastMsg("Choose local files, or drop them on the screen");
       return;
     }

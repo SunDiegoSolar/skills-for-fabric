@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0c10" />
   <title>Splash Canvas</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c10'/%3E%3Ccircle cx='22' cy='24' r='10' fill='%23e8c07a'/%3E%3Ccircle cx='44' cy='40' r='12' fill='%235a90d0'/%3E%3C/svg%3E" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,7 +14,9 @@
 </head>
 <body>
   <div id="stage">
-    <div id="bg" class="bg-aurora" aria-hidden="true"></div>
+    <div id="bg" class="bg-aurora" aria-hidden="true">
+      <i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i>
+    </div>
     <div id="dim" aria-hidden="true"></div>
     <div id="widgets"></div>
     <div id="drop-hint" hidden>Drop photos or a video to set the background</div>
@@ -47,7 +50,7 @@
       </select>
     </label>
     <label>Dim overlay
-      <input id="bg-dim" type="range" min="0" max="70" value="28" />
+      <input id="bg-dim" type="range" min="0" max="70" value="16" />
     </label>
     <label class="check">
       <input id="bg-kenburns" type="checkbox" checked />
