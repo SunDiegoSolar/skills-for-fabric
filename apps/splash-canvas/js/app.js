@@ -4,6 +4,8 @@ import { basename, identityWarp, loadSplashJson, toSplashJson } from "./project.
 import { createRenderer } from "./render.js";
 import { makeTestPattern } from "./pattern.js";
 import { makeShape, SHAPES } from "./shapes.js";
+import { makeSpooky } from "./spooky.js";
+import { IDEAS, riffFrom, riffFromText, surprise } from "./ideas.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -365,6 +367,79 @@ function applyShape(id) {
   useMesh(spec.make(), spec.id, `${spec.label} ready — drop a photo, then open Place`);
 }
 
+function applyLook(idea) {
+  state.flags.omitBlack = idea.omitBlack ?? 0;
+  state.flags.invertChannels = !!idea.invertCh;
+  const anim = idea.anim || { dirU: 0, dirV: 0, speed: 0 };
+  for (const face of state.mesh.faces) {
+    face.anim = { u: 0, v: 0, speed: anim.speed || 0, dirU: anim.dirU || 0, dirV: anim.dirV || 0 };
+  }
+  if ($("omit-black")) $("omit-black").value = String(state.flags.omitBlack);
+  if ($("invert-ch")) $("invert-ch").checked = !!state.flags.invertChannels;
+}
+
+function applyIdea(idea) {
+  if (!idea) return;
+  snapshot();
+  const spec = SHAPES.find((s) => s.id === idea.shape) || SHAPES[0];
+  useMesh(spec.make(), spec.id);
+  applyLook(idea);
+  state.mediaEl = makeSpooky(idea.pattern);
+  refreshFaces();
+  if ($("idea-seed")) $("idea-seed").value = idea.title;
+  toast(idea.how);
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+}
+
+function ideaCard(idea) {
+  return `<article class="idea-card" data-idea="${esc(idea.id)}">
+    <h3>${esc(idea.title)}</h3>
+    <p>${esc(idea.how)}</p>
+    <p>Shape <code>${esc(idea.shape)}</code> · drop <code>${esc(idea.files)}</code></p>
+    <div class="row">
+      <button type="button" data-use="${esc(idea.id)}">Use</button>
+      <button type="button" class="ghost" data-riff="${esc(idea.id)}">Riff this</button>
+    </div>
+  </article>`;
+}
+
+const riffs = [];
+
+function renderIdeas() {
+  const list = $("idea-list");
+  const extra = $("idea-riffs");
+  if (list) list.innerHTML = IDEAS.map(ideaCard).join("");
+  if (extra) extra.innerHTML = riffs.length ? riffs.map(ideaCard).join("") : "<p class='muted'>Type a spark above, or riff any starter.</p>";
+}
+
+function findIdea(id) {
+  return riffs.find((i) => i.id === id) || IDEAS.find((i) => i.id === id);
+}
+
+function addRiff(idea) {
+  riffs.unshift(idea);
+  if (riffs.length > 12) riffs.pop();
+  renderIdeas();
+  applyIdea(idea);
+}
+
+function openIdeas() {
+  const panel = $("ideas");
+  if (!panel) return;
+  panel.hidden = false;
+  document.body.dataset.ideas = "on";
+  $("idea-seed")?.focus();
+}
+
+function closeIdeas() {
+  const panel = $("ideas");
+  if (panel) panel.hidden = true;
+  document.body.dataset.ideas = "off";
+}
+
 async function loadMeshText(text, label) {
   snapshot();
   const mesh = parseObj(text);
@@ -707,6 +782,20 @@ function bind() {
     toast("Warp grid reset");
   });
   $("test-pattern")?.addEventListener("click", () => setMedia(makeTestPattern(), "Test pattern on the surface"));
+  $("ideas-open")?.addEventListener("click", openIdeas);
+  $("ideas-close")?.addEventListener("click", closeIdeas);
+  $("idea-riff")?.addEventListener("click", () => {
+    const text = $("idea-seed")?.value || "";
+    const source = riffs[0] || IDEAS[0];
+    addRiff(text.trim() ? riffFromText(text) : riffFrom(source, "again"));
+  });
+  $("idea-surprise")?.addEventListener("click", () => addRiff(surprise()));
+  $("ideas")?.addEventListener("click", (event) => {
+    const use = event.target.dataset?.use;
+    const riff = event.target.dataset?.riff;
+    if (use) applyIdea(findIdea(use));
+    if (riff) addRiff(riffFrom(findIdea(riff) || IDEAS[0], "card"));
+  });
   $("undo")?.addEventListener("click", undo);
   $("redo")?.addEventListener("click", redo);
   $("export-json")?.addEventListener("click", exportProject);
@@ -739,13 +828,17 @@ function bind() {
       return;
     }
     if (event.key === "Escape") {
+      if (!$("ideas")?.hidden) {
+        closeIdeas();
+        return;
+      }
       if (state.mode === "present") setMode("geometry");
       else {
         const off = document.body.dataset.chrome === "off";
         document.body.dataset.chrome = off ? "on" : "off";
       }
     }
-    if (event.key === "1") setMode("geometry");
+    if ((event.key === "i" || event.key === "I") && state.mode !== "present") openIdeas();
     if (event.key === "2") setMode("warp");
     if (event.key === "3") setMode("mask");
     if (event.key === "4" || event.key === "f" || event.key === "F") setMode("present");
@@ -764,6 +857,7 @@ async function main() {
   state.mediaEl = makeTestPattern();
   useMesh(makeShape("quad"), "quad");
   bind();
+  renderIdeas();
   setMode("geometry");
   toast("Quad ready — drop a photo, or pick another shape");
   requestAnimationFrame(tick);

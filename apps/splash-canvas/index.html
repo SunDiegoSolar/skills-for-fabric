@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=5" />
+  <link rel="stylesheet" href="./styles.css?v=6" />
 </head>
 <body data-mode="geometry" data-shape="quad">
   <header id="chrome">
@@ -22,6 +22,7 @@
       <button type="button" data-mode="present">Present</button>
     </nav>
     <div class="right">
+      <button type="button" id="ideas-open">Ideas</button>
       <button type="button" id="pick-media">Drop media</button>
       <button type="button" class="ghost" id="undo">Undo</button>
       <button type="button" class="ghost" id="redo">Redo</button>
@@ -149,6 +150,27 @@
   <input id="media-files" type="file" hidden accept="image/*,video/*" />
   <input id="folder" type="file" hidden webkitdirectory directory />
   <div id="toast" hidden></div>
-  <script type="module" src="./js/app.js?v=5"></script>
+
+  <aside id="ideas" hidden>
+    <div class="ideas-head">
+      <h2>Halloween ideas</h2>
+      <button type="button" class="ghost" id="ideas-close">Close</button>
+    </div>
+    <p class="muted">Click <strong>Use</strong> to load a shape + spooky look. Type a spark and <strong>Riff</strong> to grow a new idea from it.</p>
+    <label class="idea-seed-label">Grow from this
+      <input id="idea-seed" type="text" placeholder="haunted porch window, bats in the garage…" />
+    </label>
+    <div class="row">
+      <button type="button" id="idea-riff">Riff from this</button>
+      <button type="button" class="ghost" id="idea-surprise">Surprise me</button>
+    </div>
+    <p class="muted" id="idea-files">Files that drop in cleanly: PNG/JPEG/WebP/GIF (black backgrounds + Omit black), MP4/WebM loops, UV-mapped OBJ, splash.json + that OBJ. Built-in patterns need no files.</p>
+    <h2>From your riff</h2>
+    <div id="idea-riffs"></div>
+    <h2>Twenty starters</h2>
+    <div id="idea-list"></div>
+  </aside>
+
+  <script type="module" src="./js/app.js?v=6"></script>
 </body>
 </html>

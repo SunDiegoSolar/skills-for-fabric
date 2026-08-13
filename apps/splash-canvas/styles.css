@@ -154,6 +154,48 @@ code { color: var(--gold); }
   z-index: 30;
 }
 
+#ideas-open { color: var(--gold); }
+
+input[type="text"] {
+  font: inherit;
+  color: var(--ink);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+#ideas {
+  position: fixed;
+  top: 72px;
+  right: 12px;
+  bottom: 12px;
+  width: min(400px, 94vw);
+  z-index: 28;
+  overflow: auto;
+  background: #12131a;
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  padding: 16px 16px 24px;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+}
+.ideas-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ideas-head h2 { margin: 0; }
+.idea-seed-label { margin-top: 8px; }
+.idea-card {
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 8px 0;
+  background: rgba(255,255,255,0.03);
+}
+.idea-card h3 { margin: 0 0 6px; font-size: 15px; color: var(--ink); letter-spacing: 0; text-transform: none; }
+.idea-card p { margin: 0 0 8px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.idea-card .row { margin-top: 8px; }
+body[data-mode="present"] #ideas,
+body[data-chrome="off"] #ideas { display: none !important; }
+
 @media (max-width: 860px) {
   #workspace { grid-template-columns: 72px 1fr; }
   #side { position: absolute; right: 0; top: 0; bottom: 0; width: min(300px, 86vw); }

@@ -15,6 +15,10 @@ cd apps/splash-canvas
 
 Open http://127.0.0.1:8765
 
+## Halloween ideas
+
+Click **Ideas** (or `I`). Twenty spooky mapping starters load a shape + look. **Riff this** or type a spark and **Riff from this** grows a new idea from an old one. Details: [ARTIFACTS.md](./ARTIFACTS.md).
+
 ## How to map (same idea as MadMapper / HeavyM)
 
 1. Click a **shape** on the left (Quad is the usual start).
@@ -32,6 +36,7 @@ Premade shapes: Quad, Screen 16:9, Triangle, Circle, Grid wall, Cube, Corner, Cy
 | Duplicate / delete | Duplicate, Delete, or keys `D` / Delete |
 | Fill the projector | Fill output |
 | Undo | Ctrl/Cmd+Z · Redo Shift+Z |
+| Halloween ideas | **Ideas** / `I` · Use · Riff this · type a spark |
 
 Keys: `1` Look · `2` Place · `3` Mask · `4` Present · `O` hide face · `Esc` hide chrome.
 
