@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=7" />
+  <link rel="stylesheet" href="./styles.css?v=8" />
 </head>
 <body data-mode="geometry" data-shape="quad">
   <header id="chrome">
@@ -24,6 +24,8 @@
     <div class="right">
       <button type="button" id="play-matrix">Matrix</button>
       <button type="button" id="ideas-open">Ideas</button>
+      <button type="button" id="story-open">Story</button>
+      <button type="button" id="record-toggle">Record</button>
       <button type="button" id="pick-media">Drop media</button>
       <button type="button" class="ghost" id="undo">Undo</button>
       <button type="button" class="ghost" id="redo">Redo</button>
@@ -150,7 +152,24 @@
       <div class="row">
         <button type="button" class="ghost" id="anim-all">Apply to all faces</button>
       </div>
-      <p class="muted">1 Look · 2 Place · 3 Mask · 4 Present · M Matrix · I Ideas · O hide face · D duplicate · Delete remove · Ctrl/Cmd+Z undo</p>
+
+      <h2>Characters</h2>
+      <label>Kind
+        <select id="char-kind"></select>
+      </label>
+      <label>Motion
+        <select id="char-mode"></select>
+      </label>
+      <div class="row">
+        <button type="button" id="char-add">Add bouncing</button>
+        <button type="button" class="ghost" id="char-clear">Clear cast</button>
+      </div>
+      <label class="check"><input id="phys-gravity" type="checkbox" checked /> Gravity</label>
+      <label class="check"><input id="phys-faces" type="checkbox" checked /> Bounce off mapped faces</label>
+      <label class="check"><input id="phys-actors" type="checkbox" checked /> Bounce off each other</label>
+      <p class="muted" id="cast-meta">No characters yet. C adds one.</p>
+
+      <p class="muted">1 Look · 2 Place · 3 Mask · 4 Present · M Matrix · I Ideas · T story · C character · Shift+R record · O hide face · D duplicate · Delete remove · Ctrl/Cmd+Z undo</p>
     </aside>
   </main>
 
@@ -191,6 +210,37 @@
     <div id="idea-list"></div>
   </aside>
 
-  <script type="module" src="./js/app.js?v=7"></script>
+  <aside id="story" hidden>
+    <div class="ideas-head">
+      <h2>Story clock</h2>
+      <button type="button" class="ghost" id="story-close">Close</button>
+    </div>
+    <p class="muted">Cues fire at times. Characters bounce off mapped faces. Record a loop when the scene feels right.</p>
+    <p class="muted" id="story-clock">0.0s / 16s</p>
+    <label>Preset
+      <select id="story-preset"></select>
+    </label>
+    <div class="row">
+      <button type="button" id="story-load">Load</button>
+      <button type="button" id="story-play">Play</button>
+      <button type="button" class="ghost" id="story-pause">Pause</button>
+      <button type="button" class="ghost" id="story-stop">Stop</button>
+    </div>
+    <label class="check"><input id="story-loop" type="checkbox" checked /> Loop the story (then record it)</label>
+    <h2>Add a cue</h2>
+    <label>Search functions
+      <input id="fn-search" type="text" placeholder="bounce neo, kaleido, gravity, record…" />
+    </label>
+    <div class="row">
+      <button type="button" id="fn-run">Run now</button>
+      <button type="button" class="ghost" id="fn-cue">Cue at playhead</button>
+    </div>
+    <p class="muted" id="fn-count"></p>
+    <div id="fn-list"></div>
+    <h2>Cues</h2>
+    <div id="cue-list"></div>
+  </aside>
+
+  <script type="module" src="./js/app.js?v=8"></script>
 </body>
 </html>

@@ -41,3 +41,11 @@ In the app: **Ideas** (or `I`). **Matrix** / `M` plays the rain.
 Filters: Featured · All (200+) · Matrix · Kaleido · Video · Halloween.
 
 That is how you generate ideas from ideas: each card is a seed, riff mutates it, your text is another seed.
+
+## Characters, story, functions, record
+
+- **C** or **Add bouncing** — a character that ricochets off mapped faces, other characters, and the frame.
+- **Story** / **T** — timed cues. Load *Matrix chase* and Play. Loop it, then **Record** (Shift+R) to a WebM. `record/use-loop` puts that recording back on the wall.
+- Search **1,089** functions in the Story panel (look, motion, character, physics, scene, kaleido, record…). Run now or cue at the playhead.
+
+Physics/timeline/function tests: `cd apps/splash-canvas && node test/run.mjs`

@@ -7,11 +7,17 @@ import { makeShape, SHAPES } from "./shapes.js";
 import { makeSpooky } from "./spooky.js";
 import { IDEAS, FEATURED_IDS, riffFrom, riffFromText, surprise, ideaCount } from "./ideas.js";
 import { createMotion, MOTION_KINDS } from "./motion.js";
+import { createStage, clearActors, stepStage, facePolygons } from "./physics.js";
+import { CHARACTER_KINDS, SPAWN_MODES, drawCast } from "./characters.js";
+import { createTimeline, addCue, playTimeline, pauseTimeline, stopTimeline, stepTimeline } from "./timeline.js";
+import { searchFunctions, runById, functionCount } from "./functions.js";
+import { STORIES, findStory } from "./stories.js";
+import { createRecorder, startRecorder, stopRecorder, blobToVideo, downloadBlob, canRecord } from "./record.js";
 
 const $ = (id) => document.getElementById(id);
 
 const HINTS = {
-  geometry: "The Matrix is live. Place it on a wall, or open Ideas for 200+ motions. M replays the rain.",
+  geometry: "Matrix is live. C adds a bouncing character. T plays a story. Place it on a wall.",
   warp: "Drag gold corners to place this face. White points warp the whole output. Scroll to scale.",
   mask: "Paint to hide pixels. Shift-drag restores. Clear mask if you go too far.",
   present: "",
@@ -40,6 +46,7 @@ const state = {
     kaleido: 0,
     spin: 0,
     spinSpeed: 0,
+    warpBreathe: 0,
   },
 };
 
@@ -62,6 +69,15 @@ let last = performance.now();
 let motion = null;
 let ideaFilter = "featured";
 let ideaQuery = "";
+const stage = createStage();
+const timeline = createTimeline(20);
+const recorder = createRecorder();
+const recordCanvas = document.createElement("canvas");
+const rctx = recordCanvas.getContext("2d");
+let fnQuery = "";
+let fnSelected = "spawn/neo/bounce";
+let storyUiAt = 0;
+let warpBase = null;
 
 function toast(message) {
   const el = $("toast");
@@ -84,6 +100,11 @@ function capture() {
       dest: face.dest.map((p) => [...p]),
       omit: face.omit,
       anim: { ...face.anim },
+    })),
+    physics: { ...stage.physics },
+    actors: stage.actors.map((a) => ({
+      id: a.id, kind: a.kind, mode: a.mode, x: a.x, y: a.y, vx: a.vx, vy: a.vy,
+      r: a.r, frozen: a.frozen, gravity: a.gravity, phase: a.phase, hue: a.hue,
     })),
   });
 }
@@ -108,6 +129,10 @@ function applySnap(raw) {
     syncFaceDest(face);
   }
   if (typeof snap.selectedFace === "number") state.selectedFace = snap.selectedFace;
+  if (snap.physics) Object.assign(stage.physics, snap.physics);
+  if (snap.actors) {
+    stage.actors = snap.actors.map((a) => ({ ...a, orbit: a.orbit ? { ...a.orbit } : undefined }));
+  }
   refreshFaces();
 }
 
@@ -221,7 +246,11 @@ function hitHandle(event) {
 function drawOverlay() {
   resizeOverlay();
   octx.clearRect(0, 0, overlay.width, overlay.height);
-  if (state.mode === "present") return;
+  if (state.mode !== "present") drawChromeOverlay();
+  drawCast(octx, stage.actors, (x, y) => toScreen(x, y), last / 1000);
+}
+
+function drawChromeOverlay() {
   const matrix = mvp().matrix;
   const face = state.mesh.faces[state.selectedFace];
   if (face && state.mode === "geometry") {
@@ -331,6 +360,7 @@ function refreshFaces() {
   if ($("spin")) $("spin").value = String(Math.round((state.flags.spinSpeed || 0) * 100));
   if ($("live-look")) $("live-look").value = motion?.kind || "";
   document.body.dataset.motion = motion?.kind || "";
+  refreshCast();
   for (const btn of document.querySelectorAll("[data-shape]")) {
     btn.classList.toggle("active", btn.dataset.shape === state.shapeId);
   }
@@ -372,10 +402,10 @@ function useMesh(mesh, shapeId, message) {
   if (message) toast(message);
 }
 
-function applyShape(id) {
+function applyShape(id, opts = {}) {
   const spec = SHAPES.find((s) => s.id === id) || SHAPES[0];
-  snapshot();
-  useMesh(spec.make(), spec.id, `${spec.label} ready — drop a photo, then open Place`);
+  if (opts.record !== false) snapshot();
+  useMesh(spec.make(), spec.id, opts.toast === false ? undefined : `${spec.label} ready — drop a photo, then open Place`);
 }
 
 function stopMotion() {
@@ -428,6 +458,229 @@ function applyIdea(idea) {
   refreshFaces();
   if ($("idea-seed")) $("idea-seed").value = idea.title;
   toast(idea.how);
+}
+
+function chaseTarget() {
+  const face = state.mesh.faces[state.selectedFace] || state.mesh.faces[0];
+  if (!face?.dest?.length) return [0, 0];
+  const pts = face.dest.map((p) => applyWarp(state.warp, p[0], p[1]));
+  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  return [cx, cy];
+}
+
+function syncLook() {
+  if ($("omit-black")) $("omit-black").value = String(state.flags.omitBlack);
+  if ($("invert-ch")) $("invert-ch").checked = !!state.flags.invertChannels;
+  if ($("flip")) $("flip").checked = !!state.flags.flip;
+  if ($("flop")) $("flop").checked = !!state.flags.flop;
+  if ($("kaleido")) $("kaleido").value = String(state.flags.kaleido || 0);
+  if ($("spin")) $("spin").value = String(Math.round((state.flags.spinSpeed || 0) * 100));
+  if ($("invert-mask")) $("invert-mask").checked = !!state.flags.invertMask;
+  if ($("phys-gravity")) $("phys-gravity").checked = stage.physics.gravity > 0.05;
+  if ($("phys-faces")) $("phys-faces").checked = !!stage.physics.faces;
+  if ($("phys-actors")) $("phys-actors").checked = !!stage.physics.actors;
+  if ($("story-loop")) $("story-loop").checked = !!timeline.looping;
+}
+
+function refreshCast() {
+  const meta = $("cast-meta");
+  if (meta) {
+    meta.textContent = stage.actors.length
+      ? `${stage.actors.length} character${stage.actors.length === 1 ? "" : "s"} bouncing`
+      : "No characters yet. C adds one.";
+  }
+}
+
+function makeCtx() {
+  return {
+    state,
+    stage,
+    timeline,
+    playMotion: (kind) => playMotion(kind),
+    stopMotion,
+    applyShape: (id) => applyShape(id, { record: false, toast: false }),
+    applyIdeaById: (id) => applyIdea(findIdea(id) || IDEAS[0]),
+    setMedia,
+    toast,
+    syncLook,
+    refresh: () => { refreshFaces(); refreshCast(); },
+    snapshot,
+    resetWarp: () => { state.warp = identityWarp(); warpBase = null; state.flags.warpBreathe = 0; },
+    fitDest,
+    duplicateFace,
+    playStory,
+    pauseStory: () => pauseTimeline(timeline),
+    stopStory: () => { stopTimeline(timeline); updateStoryClock(); },
+    setStoryLoop: (on) => { timeline.looping = !!on; },
+    loadStory,
+    startRecord,
+    stopRecord,
+    useRecordingLoop,
+    makeTestPattern,
+    setSpooky: (name) => { stopMotion(); state.mediaEl = makeSpooky(name); },
+  };
+}
+
+function runFn(id) {
+  const r = runById(id, makeCtx());
+  syncLook();
+  refreshFaces();
+  refreshCast();
+  if (!r.ok) toast(r.error || "Function failed");
+  return r;
+}
+
+function spawnFromUi() {
+  snapshot();
+  const kind = $("char-kind")?.value || "neo";
+  const mode = $("char-mode")?.value || "bounce";
+  runFn(`spawn/${kind}/${mode}`);
+  toast(`${kind} · ${mode}`);
+}
+
+function loadStory(id, opts = {}) {
+  const story = findStory(id || $("story-preset")?.value);
+  if (!story) return;
+  timeline.cues = [];
+  timeline.duration = story.duration;
+  timeline.t = 0;
+  timeline.playing = false;
+  timeline.lastIndex = -1;
+  for (const cue of story.cues) addCue(timeline, { ...cue });
+  if ($("story-preset")) $("story-preset").value = story.id;
+  renderStory();
+  if (opts.toast !== false) toast(`${story.name} loaded`);
+}
+
+function playStory() {
+  if (!timeline.cues.length) loadStory("matrix-chase");
+  playTimeline(timeline);
+  toast("Story playing");
+}
+
+function renderFns() {
+  const list = $("fn-list");
+  const hits = searchFunctions(fnQuery).slice(0, 40);
+  if ($("fn-count")) {
+    $("fn-count").textContent = `${functionCount()} functions · showing ${hits.length}${fnQuery ? ` for “${fnQuery}”` : ""}`;
+  }
+  if (!list) return;
+  list.innerHTML = hits.map((fn) => `<div class="fn-row ${fn.id === fnSelected ? "active" : ""}" data-fn="${esc(fn.id)}">
+    <span><strong>${esc(fn.name)}</strong><br><code>${esc(fn.id)}</code></span>
+    <span class="row">
+      <button type="button" data-fn-run="${esc(fn.id)}">Run</button>
+      <button type="button" class="ghost" data-fn-cue="${esc(fn.id)}">Cue</button>
+    </span>
+  </div>`).join("");
+}
+
+function renderCues() {
+  const list = $("cue-list");
+  if (!list) return;
+  if (!timeline.cues.length) {
+    list.innerHTML = "<p class='muted'>Load a preset or cue a function at the playhead.</p>";
+    return;
+  }
+  list.innerHTML = timeline.cues.map((cue, i) => `<div class="cue-row">
+    <span>${cue.at.toFixed(1)}s · <code>${esc(cue.fn)}</code></span>
+    <button type="button" class="ghost" data-cue-del="${i}">Remove</button>
+  </div>`).join("");
+}
+
+function renderStory() {
+  renderFns();
+  renderCues();
+  updateStoryClock();
+}
+
+function updateStoryClock() {
+  const el = $("story-clock");
+  if (el) el.textContent = `${timeline.t.toFixed(1)}s / ${timeline.duration.toFixed(0)}s${timeline.playing ? " · playing" : ""}`;
+}
+
+function openStory() {
+  const panel = $("story");
+  if (!panel) return;
+  panel.hidden = false;
+  document.body.dataset.story = "on";
+  renderStory();
+  $("fn-search")?.focus();
+}
+
+function closeStory() {
+  const panel = $("story");
+  if (panel) panel.hidden = true;
+  document.body.dataset.story = "off";
+}
+
+function cueAtPlayhead(id) {
+  addCue(timeline, { at: Number(timeline.t.toFixed(2)), fn: id || fnSelected });
+  renderCues();
+  toast(`Cue at ${timeline.t.toFixed(1)}s`);
+}
+
+function blitRecord() {
+  if (!recorder.recording) return;
+  if (recordCanvas.width !== canvas.width || recordCanvas.height !== canvas.height) {
+    recordCanvas.width = canvas.width || 1280;
+    recordCanvas.height = canvas.height || 720;
+  }
+  try {
+    rctx.drawImage(canvas, 0, 0);
+    rctx.drawImage(overlay, 0, 0, recordCanvas.width, recordCanvas.height);
+  } catch {
+    /* canvas may be 0-size on first frame */
+  }
+}
+
+function startRecord() {
+  if (!canRecord()) {
+    toast("This browser cannot record a canvas loop");
+    return;
+  }
+  blitRecord();
+  try {
+    startRecorder(recorder, recordCanvas, 30);
+    document.body.dataset.recording = "on";
+    if ($("record-toggle")) $("record-toggle").textContent = "Stop rec";
+    toast("Recording loop");
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+async function stopRecord() {
+  const blob = await stopRecorder(recorder);
+  document.body.dataset.recording = "off";
+  if ($("record-toggle")) $("record-toggle").textContent = "Record";
+  if (!blob || !blob.size) {
+    toast("Nothing recorded");
+    return blob;
+  }
+  downloadBlob(blob);
+  toast("Saved WebM — Use as loop from Story if you want it on the wall");
+  return blob;
+}
+
+function useRecordingLoop() {
+  if (!recorder.lastBlob) {
+    toast("Record a loop first");
+    return;
+  }
+  const video = blobToVideo(recorder.lastBlob);
+  if (video) setMedia(video, "Recorded loop on the surface");
+}
+
+function applyWarpBreathe(now) {
+  if (!state.flags.warpBreathe) return;
+  if (!warpBase) warpBase = state.warp.points.map((p) => [...p]);
+  const amt = 0.035 * state.flags.warpBreathe;
+  const t = now / 1000;
+  state.warp.points = warpBase.map((p, i) => [
+    p[0] + Math.sin(t * 1.3 + i * 0.4) * amt,
+    p[1] + Math.cos(t * 1.1 + i * 0.7) * amt,
+  ]);
 }
 
 function esc(s) {
@@ -714,7 +967,10 @@ function onPointerMove(event) {
     drag.moved = true;
     state.camera.yaw = drag.yaw + (event.clientX - drag.x) * 0.01;
     state.camera.pitch = Math.max(-1.2, Math.min(1.2, drag.pitch + (event.clientY - drag.y) * 0.01));
-  } else if (drag.kind === "warp") state.warp.points[drag.index] = [nx, ny];
+  } else if (drag.kind === "warp") {
+    state.warp.points[drag.index] = [nx, ny];
+    warpBase = null;
+  }
   else if (drag.kind === "dest") {
     setFaceDest(state.mesh.faces[drag.face], drag.index, inverseWarp(state.warp, nx, ny));
   } else if (drag.kind === "move-face" && state.selectedFace >= 0) {
@@ -740,6 +996,11 @@ function tick(now) {
   if (state.flags.spinSpeed) {
     state.flags.spin = (state.flags.spin || 0) + state.flags.spinSpeed * dt;
   }
+  applyWarpBreathe(now);
+  const polys = facePolygons(state.mesh, (x, y) => applyWarp(state.warp, x, y));
+  stepStage(stage, dt, polys, chaseTarget());
+  const due = stepTimeline(timeline, dt);
+  for (const cue of due) runFn(cue.fn);
   for (const face of state.mesh.faces) {
     if (!face.anim.speed) continue;
     face.anim.u = (face.anim.u + face.anim.speed * (face.anim.dirU || 0) * dt) % 1;
@@ -756,6 +1017,11 @@ function tick(now) {
     flags: state.flags,
   });
   drawOverlay();
+  blitRecord();
+  if (now - storyUiAt > 120) {
+    storyUiAt = now;
+    if (document.body.dataset.story === "on") updateStoryClock();
+  }
   requestAnimationFrame(tick);
 }
 
@@ -856,6 +1122,54 @@ function bind() {
     playMotion(kind, `${MOTION_KINDS.find((k) => k.id === kind)?.label || kind} is live`);
   });
   $("play-matrix")?.addEventListener("click", () => applyIdea(IDEAS[0]));
+  $("char-add")?.addEventListener("click", spawnFromUi);
+  $("char-clear")?.addEventListener("click", () => {
+    snapshot();
+    clearActors(stage);
+    refreshCast();
+    toast("Cast cleared");
+  });
+  $("phys-gravity")?.addEventListener("change", (event) => {
+    stage.physics.gravity = event.target.checked ? 0.55 : 0;
+  });
+  $("phys-faces")?.addEventListener("change", (event) => {
+    stage.physics.faces = event.target.checked;
+  });
+  $("phys-actors")?.addEventListener("change", (event) => {
+    stage.physics.actors = event.target.checked;
+  });
+  $("story-open")?.addEventListener("click", openStory);
+  $("story-close")?.addEventListener("click", closeStory);
+  $("story-load")?.addEventListener("click", () => loadStory($("story-preset")?.value));
+  $("story-play")?.addEventListener("click", playStory);
+  $("story-pause")?.addEventListener("click", () => { pauseTimeline(timeline); updateStoryClock(); });
+  $("story-stop")?.addEventListener("click", () => { stopTimeline(timeline); updateStoryClock(); });
+  $("story-loop")?.addEventListener("change", (event) => { timeline.looping = event.target.checked; });
+  $("fn-search")?.addEventListener("input", (event) => {
+    fnQuery = event.target.value || "";
+    renderFns();
+  });
+  $("fn-run")?.addEventListener("click", () => runFn(fnSelected));
+  $("fn-cue")?.addEventListener("click", () => cueAtPlayhead(fnSelected));
+  $("fn-list")?.addEventListener("click", (event) => {
+    const run = event.target.dataset?.fnRun;
+    const cue = event.target.dataset?.fnCue;
+    const row = event.target.closest("[data-fn]");
+    if (row?.dataset.fn) fnSelected = row.dataset.fn;
+    if (run) runFn(run);
+    if (cue) cueAtPlayhead(cue);
+    renderFns();
+  });
+  $("cue-list")?.addEventListener("click", (event) => {
+    const i = event.target.dataset?.cueDel;
+    if (i == null) return;
+    timeline.cues.splice(Number(i), 1);
+    renderCues();
+  });
+  $("record-toggle")?.addEventListener("click", () => {
+    if (recorder.recording) stopRecord();
+    else startRecord();
+  });
   $("clear-mask")?.addEventListener("click", () => {
     snapshot();
     mctx.fillStyle = "#fff";
@@ -864,6 +1178,8 @@ function bind() {
   $("reset-warp")?.addEventListener("click", () => {
     snapshot();
     state.warp = identityWarp();
+    warpBase = null;
+    state.flags.warpBreathe = 0;
     toast("Warp grid reset");
   });
   $("test-pattern")?.addEventListener("click", () => setMedia(makeTestPattern(), "Test pattern on the surface"));
@@ -923,6 +1239,10 @@ function bind() {
       return;
     }
     if (event.key === "Escape") {
+      if (!$("story")?.hidden) {
+        closeStory();
+        return;
+      }
       if (!$("ideas")?.hidden) {
         closeIdeas();
         return;
@@ -935,6 +1255,18 @@ function bind() {
     }
     if ((event.key === "i" || event.key === "I") && state.mode !== "present") openIdeas();
     if ((event.key === "m" || event.key === "M") && state.mode !== "present") applyIdea(IDEAS[0]);
+    if ((event.key === "t" || event.key === "T") && state.mode !== "present") {
+      if ($("story")?.hidden) openStory();
+      if (timeline.playing) {
+        pauseTimeline(timeline);
+        updateStoryClock();
+      } else playStory();
+    }
+    if ((event.key === "c" || event.key === "C") && state.mode !== "present") spawnFromUi();
+    if (event.key === "R" && event.shiftKey && state.mode !== "present") {
+      if (recorder.recording) stopRecord();
+      else startRecord();
+    }
     if (event.key === "1") setMode("geometry");
     if (event.key === "2") setMode("warp");
     if (event.key === "3") setMode("mask");
@@ -960,11 +1292,43 @@ async function main() {
       liveSel.append(opt);
     }
   }
+  const kindSel = $("char-kind");
+  if (kindSel) {
+    for (const kind of CHARACTER_KINDS) {
+      const opt = document.createElement("option");
+      opt.value = kind.id;
+      opt.textContent = kind.label;
+      kindSel.append(opt);
+    }
+    kindSel.value = "neo";
+  }
+  const modeSel = $("char-mode");
+  if (modeSel) {
+    for (const mode of SPAWN_MODES) {
+      const opt = document.createElement("option");
+      opt.value = mode.id;
+      opt.textContent = mode.label;
+      modeSel.append(opt);
+    }
+    modeSel.value = "bounce";
+  }
+  const storySel = $("story-preset");
+  if (storySel) {
+    for (const story of STORIES) {
+      const opt = document.createElement("option");
+      opt.value = story.id;
+      opt.textContent = story.name;
+      storySel.append(opt);
+    }
+  }
   useMesh(makeShape("screen"), "screen");
   bind();
   renderIdeas();
   setMode("geometry");
   applyIdea(IDEAS[0]);
+  loadStory("matrix-chase", { toast: false });
+  syncLook();
+  renderStory();
   requestAnimationFrame(tick);
 }
 

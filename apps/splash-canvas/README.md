@@ -15,7 +15,15 @@ cd apps/splash-canvas
 
 Open http://127.0.0.1:8765
 
-The studio starts on **The Matrix** — live green code rain on a screen shape. **M** or the Matrix button replays it. **Place** it on a dark wall.
+The studio starts on **The Matrix** — live green code rain on a screen shape. **M** or the Matrix button replays it. **Place** it on a dark wall. **C** drops a bouncing character. **T** plays a timed story.
+
+## Characters, story, record
+
+Characters bounce off mapped faces, each other, and the frame. Gravity is optional. Twenty kinds (Neo, Agent, ghost, cat, pumpkin…) and eight motions (bounce, gravity, rain, float, chase, orbit…).
+
+**Story** is a clock: cues fire functions at times so a look can change, a character can enter, a kaleidoscope can fold, then it loops. Presets: Matrix chase, Porch visitors, Bounce cast, Kaleido night. Search **1,089** callable functions, **Run now** or **Cue at playhead**.
+
+**Record** captures the WebGL view + characters to a WebM. Download it, or put it back on the surface as a looping video (`record/use-loop`).
 
 ## Motion ideas
 
@@ -44,8 +52,17 @@ Premade shapes: Quad, Screen 16:9, Triangle, Circle, Grid wall, Cube, Corner, Cy
 | Duplicate / delete | Duplicate, Delete, or keys `D` / Delete |
 | Fill the projector | Fill output |
 | Undo | Ctrl/Cmd+Z · Redo Shift+Z |
+| Characters | Add bouncing, or `C` · they bounce off mapped faces |
+| Story clock | **Story** / `T` · Load preset · Play · cue functions at times |
+| Record loop | **Record** / Shift+R · saves WebM · Story function `record/use-loop` |
 | Ideas | **Ideas** / `I` · **Matrix** / `M` · Use · Riff this · type a spark |
 
-Keys: `1` Look · `2` Place · `3` Mask · `4` Present · `M` Matrix · `I` Ideas · `O` hide face · `Esc` hide chrome.
+Keys: `1` Look · `2` Place · `3` Mask · `4` Present · `M` Matrix · `I` Ideas · `T` story · `C` character · `Shift+R` record · `O` hide face · `Esc` hide chrome.
+
+Engine tests (physics, timeline, all 1,089 functions):
+
+```bash
+cd apps/splash-canvas && node test/run.mjs
+```
 
 Drop `splash.json` + `*.obj` from Blender’s Splash addon or from `splash-master` if you already have a project.
