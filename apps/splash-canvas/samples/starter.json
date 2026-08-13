@@ -1,0 +1,31 @@
+{
+  "description": "splashConfiguration",
+  "version": "web-canvas",
+  "world": { "framerate": 60 },
+  "scenes": {
+    "local": {
+      "links": [
+        ["mesh", "object"],
+        ["image", "object"],
+        ["object", "warp"],
+        ["warp", "window"]
+      ],
+      "objects": {
+        "mesh": { "type": "mesh", "file": ["./samples/grid_wall.obj"] },
+        "image": { "type": "image", "file": [""] },
+        "object": { "type": "object" },
+        "warp": {
+          "type": "warp",
+          "patchSize": [4, 4],
+          "patchControl": [4, 4,
+            [-1, -1], [-0.333, -1], [0.333, -1], [1, -1],
+            [-1, -0.333], [-0.333, -0.333], [0.333, -0.333], [1, -0.333],
+            [-1, 0.333], [-0.333, 0.333], [0.333, 0.333], [1, 0.333],
+            [-1, 1], [-0.333, 1], [0.333, 1], [1, 1]
+          ]
+        },
+        "window": { "type": "window" }
+      }
+    }
+  }
+}
