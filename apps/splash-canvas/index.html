@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Splash Canvas — mapping studio</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c10'/%3E%3Ccircle cx='22' cy='24' r='10' fill='%23e8c07a'/%3E%3Ccircle cx='44' cy='40' r='12' fill='%235a90d0'/%3E%3C/svg%3E" />
+  <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
@@ -20,7 +21,10 @@
       <button type="button" data-mode="present">Present</button>
     </nav>
     <div class="right">
-      <button type="button" id="pick-files">Open Splash files</button>
+      <button type="button" class="ghost" id="undo">Undo</button>
+      <button type="button" class="ghost" id="export-json">Export JSON</button>
+      <button type="button" id="pick-files">Open files</button>
+      <button type="button" class="ghost" id="pick-folder">Open folder</button>
       <button type="button" class="ghost" id="fullscreen">Fullscreen</button>
     </div>
   </header>
@@ -29,17 +33,31 @@
     <section id="viewport">
       <canvas id="gl"></canvas>
       <canvas id="overlay"></canvas>
-      <p id="hint">Drop splash.json, OBJ meshes, photos, or video. Click a face to pin. Pinch to scale a section. Paint mask to omit.</p>
+      <p id="hint">Drop splash.json + matching OBJ (and media). Click a face to pin. Pinch to scale. Warp moves the section onto a surface.</p>
     </section>
     <aside id="side">
       <h2>Graph</h2>
       <div id="graph"></div>
       <h2>Faces</h2>
       <div id="face-list"></div>
-      <h2>Selected face</h2>
+      <p class="muted" id="face-meta">No face selected</p>
       <div class="row">
         <button type="button" id="omit-face">Omit / restore face</button>
       </div>
+      <label class="check"><input id="invert-faces" type="checkbox" /> Invert omitted faces</label>
+
+      <h2>Media</h2>
+      <label>Pin to
+        <select id="media-target">
+          <option value="all">Whole object (Splash default)</option>
+          <option value="face">Selected face only</option>
+        </select>
+      </label>
+      <div class="row">
+        <button type="button" class="ghost" id="test-pattern">UV test pattern</button>
+      </div>
+
+      <h2>Selected face motion</h2>
       <label>Animation
         <select id="anim-dir">
           <option value="off">Off</option>
@@ -52,7 +70,12 @@
       <label>Speed
         <input id="anim-speed" type="range" min="0" max="40" value="8" />
       </label>
-      <h2>Black / mask</h2>
+      <div class="row">
+        <button type="button" class="ghost" id="anim-all">Copy motion to all faces</button>
+      </div>
+
+      <h2>Black / mask / filter</h2>
+      <p class="muted">Splash Filter: blackLevel lifts RGB toward white. invertChannels swaps red and blue.</p>
       <label>Pixel omit
         <select id="omit-black">
           <option value="0">Show all color</option>
@@ -63,20 +86,23 @@
       <label>Luma threshold
         <input id="threshold" type="range" min="0" max="60" value="8" />
       </label>
-      <label>Black level (Splash lift)
-        <input id="black-level" type="range" min="0" max="80" value="0" />
+      <label>Black level (0–255)
+        <input id="black-level" type="range" min="0" max="255" value="0" />
       </label>
+      <label class="check"><input id="invert-ch" type="checkbox" /> Swap red / blue (invertChannels)</label>
+      <label class="check"><input id="flip" type="checkbox" /> Flip U</label>
+      <label class="check"><input id="flop" type="checkbox" /> Flop V</label>
       <label class="check"><input id="invert-mask" type="checkbox" /> Invert painted mask</label>
-      <label class="check"><input id="invert-faces" type="checkbox" /> Invert omitted faces</label>
       <div class="row">
         <button type="button" class="ghost" id="clear-mask">Clear mask</button>
         <button type="button" class="ghost" id="reset-warp">Reset warp grid</button>
       </div>
-      <p class="muted">Keys: 1 geometry · 2 warp · 3 mask · 4 present · O omit face. Shift-drag on mask restores color.</p>
+      <p class="muted">Keys: 1 geometry · 2 warp · 3 mask · 4 / F present · O omit · Ctrl/Cmd+Z undo · Esc hide chrome. Shift-drag on mask restores color.</p>
     </aside>
   </main>
 
-  <input id="files" type="file" hidden multiple accept=".json,.obj,image/*,video/*" />
+  <input id="files" type="file" hidden multiple accept=".json,.obj,.png,.jpg,.jpeg,.webp,.gif,.mp4,.webm,.mov,image/*,video/*" />
+  <input id="folder" type="file" hidden webkitdirectory directory />
   <div id="toast" hidden></div>
   <script type="module" src="./js/app.js"></script>
 </body>

@@ -132,3 +132,53 @@ export function applyPatch(grid, x, y) {
   const v = (y + 1) / 2;
   return bezierPatch(grid, u, v);
 }
+
+function binomial(n, k) {
+  if (k < 0 || k > n) return 0;
+  let result = 1;
+  for (let i = 1; i <= k; i += 1) result = (result * (n - k + i)) / i;
+  return result;
+}
+
+/** Splash Mesh_BezierPatch evaluation (Bernstein basis, any patch size). */
+export function applyWarp(warp, x, y) {
+  const [cols, rows] = warp.patchSize;
+  const u = (x + 1) / 2;
+  const v = (y + 1) / 2;
+  let px = 0;
+  let py = 0;
+  for (let j = 0; j < rows; j += 1) {
+    const by = binomial(rows - 1, j) * (v ** j) * ((1 - v) ** (rows - 1 - j));
+    for (let i = 0; i < cols; i += 1) {
+      const bx = binomial(cols - 1, i) * (u ** i) * ((1 - u) ** (cols - 1 - i));
+      const p = warp.points[i + j * cols];
+      if (!p) continue;
+      px += bx * by * p[0];
+      py += bx * by * p[1];
+    }
+  }
+  return [px, py];
+}
+
+/** Newton inverse of applyWarp so dest handles drag in screen space. */
+export function inverseWarp(warp, x, y, iters = 16) {
+  let dx = x;
+  let dy = y;
+  const e = 0.004;
+  for (let n = 0; n < iters; n += 1) {
+    const [px, py] = applyWarp(warp, dx, dy);
+    const [pxu, pyu] = applyWarp(warp, dx + e, dy);
+    const [pxv, pyv] = applyWarp(warp, dx, dy + e);
+    const j00 = (pxu - px) / e;
+    const j10 = (pyu - py) / e;
+    const j01 = (pxv - px) / e;
+    const j11 = (pyv - py) / e;
+    const det = j00 * j11 - j01 * j10;
+    if (Math.abs(det) < 1e-8) break;
+    dx += (j11 * (x - px) - j01 * (y - py)) / det;
+    dy += (-j10 * (x - px) + j00 * (y - py)) / det;
+    dx = Math.min(1.5, Math.max(-1.5, dx));
+    dy = Math.min(1.5, Math.max(-1.5, dy));
+  }
+  return [dx, dy];
+}

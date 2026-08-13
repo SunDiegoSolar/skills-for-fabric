@@ -1,7 +1,8 @@
-import { invert, lookAt, multiply, perspective, subtract, transformPoint, normalize } from "./math.js";
-import { loadObj, parseObj, pickFace } from "./obj.js";
-import { identityWarp, loadSplashJson } from "./project.js";
+import { invert, lookAt, multiply, perspective, subtract, transformPoint, normalize, applyWarp, inverseWarp } from "./math.js";
+import { loadObj, parseObj, pickFace, setFaceDest, syncFaceDest } from "./obj.js";
+import { basename, identityWarp, loadSplashJson, toSplashJson } from "./project.js";
 import { createRenderer } from "./render.js";
+import { makeTestPattern } from "./pattern.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -9,18 +10,21 @@ const state = {
   mode: "geometry",
   mesh: { faces: [] },
   warp: identityWarp(),
-  camera: { yaw: 0.6, pitch: 0.35, dist: 3.2 },
+  camera: { yaw: 0.55, pitch: 0.28, dist: 3.1 },
   selectedFace: -1,
-  selectedPoint: null,
   mediaEl: null,
   graph: { objects: [], links: [] },
   flags: {
     omitBlack: 0,
     invertMask: false,
     invertFaces: false,
+    invertChannels: false,
+    flip: false,
+    flop: false,
     threshold: 0.08,
     blackLevel: 0,
     showGrid: true,
+    mediaTarget: "all",
   },
 };
 
@@ -34,6 +38,7 @@ const mctx = maskCanvas.getContext("2d");
 mctx.fillStyle = "#fff";
 mctx.fillRect(0, 0, 1024, 1024);
 
+const history = [];
 let renderer;
 let drag = null;
 let pointers = new Map();
@@ -41,17 +46,48 @@ let last = performance.now();
 
 function toast(message) {
   const el = $("toast");
+  if (!el) return;
   el.hidden = false;
   el.textContent = message;
   clearTimeout(el._t);
   el._t = setTimeout(() => { el.hidden = true; }, 2400);
 }
 
+function snapshot() {
+  history.push(JSON.stringify({
+    warp: state.warp,
+    flags: state.flags,
+    faces: state.mesh.faces.map((face) => ({
+      id: face.id,
+      dest: face.dest.map((p) => [...p]),
+      omit: face.omit,
+      anim: { ...face.anim },
+    })),
+  }));
+  if (history.length > 60) history.shift();
+}
+
+function undo() {
+  const raw = history.pop();
+  if (!raw) return;
+  const snap = JSON.parse(raw);
+  state.warp = snap.warp;
+  Object.assign(state.flags, snap.flags);
+  for (const saved of snap.faces) {
+    const face = state.mesh.faces[saved.id];
+    if (!face) continue;
+    face.dest = saved.dest;
+    face.omit = saved.omit;
+    face.anim = saved.anim;
+    syncFaceDest(face);
+  }
+  refreshFaces();
+  toast("Undo");
+}
+
 function resizeOverlay() {
   overlay.width = canvas.clientWidth;
   overlay.height = canvas.clientHeight;
-  overlay.style.width = `${canvas.clientWidth}px`;
-  overlay.style.height = `${canvas.clientHeight}px`;
 }
 
 function mvp() {
@@ -77,6 +113,25 @@ function ndcFromEvent(event) {
   ];
 }
 
+function projectPoint(v3, matrix) {
+  const p = transformPoint(matrix, [v3[0], v3[1], v3[2], 1]);
+  const w = p[3] || 1;
+  return [
+    ((p[0] / w + 1) * 0.5) * overlay.width,
+    (1 - (p[1] / w + 1) * 0.5) * overlay.height,
+  ];
+}
+
+function toScreen(x, y) {
+  return [((x + 1) * 0.5) * overlay.width, (1 - (y + 1) * 0.5) * overlay.height];
+}
+
+function destScreen(face, index) {
+  const d = face.dest[index];
+  const warped = applyWarp(state.warp, d[0], d[1]);
+  return toScreen(warped[0], warped[1]);
+}
+
 function pickGeometry(event) {
   const [nx, ny] = ndcFromEvent(event);
   const { eye, matrix } = mvp();
@@ -85,23 +140,25 @@ function pickGeometry(event) {
   const far = transformPoint(inv, [nx, ny, 1, 1]);
   const n3 = [near[0] / near[3], near[1] / near[3], near[2] / near[3]];
   const f3 = [far[0] / far[3], far[1] / far[3], far[2] / far[3]];
-  const dir = normalize(subtract(f3, n3));
-  return pickFace(state.mesh, eye, dir);
+  return pickFace(state.mesh, eye, normalize(subtract(f3, n3)));
 }
 
-function hitDestCorner(nx, ny) {
-  const near = (x, y, px, py) => Math.hypot(x - px, y - py) < 0.08;
+function hitHandle(event) {
+  const r = overlay.getBoundingClientRect();
+  const sx = event.clientX - r.left;
+  const sy = event.clientY - r.top;
+  const near = (x, y) => Math.hypot(x - sx, y - sy) < 14;
   if (state.mode === "warp") {
     for (let i = 0; i < state.warp.points.length; i += 1) {
-      const p = state.warp.points[i];
-      if (near(nx, ny, p[0], p[1])) return { kind: "warp", index: i };
+      const [x, y] = toScreen(state.warp.points[i][0], state.warp.points[i][1]);
+      if (near(x, y)) return { kind: "warp", index: i };
     }
-  }
-  const face = state.mesh.faces[state.selectedFace];
-  if (face && (state.mode === "warp" || state.mode === "geometry")) {
-    for (let i = 0; i < face.dest.length; i += 1) {
-      const p = face.dest[i];
-      if (near(nx, ny, p[0], p[1])) return { kind: "dest", face: face.id, index: i };
+    const face = state.mesh.faces[state.selectedFace];
+    if (face) {
+      for (let i = 0; i < face.dest.length; i += 1) {
+        const [x, y] = destScreen(face, i);
+        if (near(x, y)) return { kind: "dest", face: face.id, index: i };
+      }
     }
   }
   return null;
@@ -111,40 +168,54 @@ function drawOverlay() {
   resizeOverlay();
   octx.clearRect(0, 0, overlay.width, overlay.height);
   if (state.mode === "present") return;
-  const toX = (x) => ((x + 1) * 0.5) * overlay.width;
-  const toY = (y) => (1 - (y + 1) * 0.5) * overlay.height;
-  if (state.mode === "warp" || state.mode === "geometry") {
-    const face = state.mesh.faces[state.selectedFace];
-    if (face) {
-      octx.strokeStyle = "rgba(232,192,122,0.95)";
-      octx.lineWidth = 2;
+  const matrix = mvp().matrix;
+  const face = state.mesh.faces[state.selectedFace];
+  if (face && state.mode === "geometry") {
+    octx.strokeStyle = "rgba(232,192,122,0.95)";
+    octx.lineWidth = 2;
+    octx.beginPath();
+    face.verts.forEach((v, i) => {
+      const [x, y] = projectPoint(v, matrix);
+      if (i === 0) octx.moveTo(x, y);
+      else octx.lineTo(x, y);
+    });
+    octx.closePath();
+    octx.stroke();
+    const [lx, ly] = projectPoint(face.verts[0], matrix);
+    octx.fillStyle = "#e8c07a";
+    octx.font = "600 12px Outfit, sans-serif";
+    octx.fillText(`Face ${face.id}`, lx + 8, ly - 8);
+  }
+  if (face && state.mode === "warp") {
+    octx.strokeStyle = "rgba(232,192,122,0.95)";
+    octx.lineWidth = 2;
+    octx.beginPath();
+    face.dest.forEach((_, i) => {
+      const [x, y] = destScreen(face, i);
+      if (i === 0) octx.moveTo(x, y);
+      else octx.lineTo(x, y);
+    });
+    octx.closePath();
+    octx.stroke();
+    face.dest.forEach((_, i) => {
+      const [x, y] = destScreen(face, i);
+      octx.fillStyle = "#e8c07a";
       octx.beginPath();
-      face.dest.forEach((p, i) => {
-        const x = toX(p[0]);
-        const y = toY(p[1]);
-        if (i === 0) octx.moveTo(x, y);
-        else octx.lineTo(x, y);
-      });
-      octx.closePath();
-      octx.stroke();
-      face.dest.forEach((p) => {
-        octx.fillStyle = "#e8c07a";
-        octx.beginPath();
-        octx.arc(toX(p[0]), toY(p[1]), 6, 0, Math.PI * 2);
-        octx.fill();
-      });
-    }
+      octx.arc(x, y, 6, 0, Math.PI * 2);
+      octx.fill();
+    });
+    const [lx, ly] = destScreen(face, 0);
+    octx.fillStyle = "#e8c07a";
+    octx.font = "600 12px Outfit, sans-serif";
+    octx.fillText(`Face ${face.id} dest`, lx + 8, ly - 8);
   }
   if (state.mode === "warp") {
     octx.strokeStyle = "rgba(244,241,234,0.28)";
-    octx.lineWidth = 1;
     const [cols, rows] = state.warp.patchSize;
     for (let j = 0; j < rows; j += 1) {
       octx.beginPath();
       for (let i = 0; i < cols; i += 1) {
-        const p = state.warp.points[j * cols + i];
-        const x = toX(p[0]);
-        const y = toY(p[1]);
+        const [x, y] = toScreen(state.warp.points[j * cols + i][0], state.warp.points[j * cols + i][1]);
         if (i === 0) octx.moveTo(x, y);
         else octx.lineTo(x, y);
       }
@@ -153,39 +224,61 @@ function drawOverlay() {
     for (let i = 0; i < cols; i += 1) {
       octx.beginPath();
       for (let j = 0; j < rows; j += 1) {
-        const p = state.warp.points[j * cols + i];
-        const x = toX(p[0]);
-        const y = toY(p[1]);
+        const [x, y] = toScreen(state.warp.points[j * cols + i][0], state.warp.points[j * cols + i][1]);
         if (j === 0) octx.moveTo(x, y);
         else octx.lineTo(x, y);
       }
       octx.stroke();
     }
     state.warp.points.forEach((p) => {
+      const [x, y] = toScreen(p[0], p[1]);
       octx.fillStyle = "#f4f1ea";
       octx.beginPath();
-      octx.arc(toX(p[0]), toY(p[1]), 5, 0, Math.PI * 2);
+      octx.arc(x, y, 5, 0, Math.PI * 2);
       octx.fill();
     });
   }
   if (state.mode === "mask") {
-    octx.globalAlpha = 0.35;
+    octx.globalAlpha = 0.38;
     octx.drawImage(maskCanvas, 0, 0, overlay.width, overlay.height);
     octx.globalAlpha = 1;
   }
 }
 
+function syncAnimControls() {
+  const face = state.mesh.faces[state.selectedFace];
+  const dir = $("anim-dir");
+  const speed = $("anim-speed");
+  const meta = $("face-meta");
+  if (!face) {
+    if (meta) meta.textContent = "No face selected";
+    return;
+  }
+  if (meta) {
+    meta.textContent = `Face ${face.id}${face.omit ? " · omitted" : ""}${face.media ? " · pinned media" : ""} · ${face.verts.length} corners`;
+  }
+  if (!dir || !speed) return;
+  if (!face.anim.speed) dir.value = "off";
+  else if (face.anim.dirU > 0) dir.value = "u+";
+  else if (face.anim.dirU < 0) dir.value = "u-";
+  else if (face.anim.dirV > 0) dir.value = "v+";
+  else if (face.anim.dirV < 0) dir.value = "v-";
+  else dir.value = "off";
+  speed.value = Math.round((face.anim.speed || 0) * 100);
+}
+
 function refreshFaces() {
-  const list = $("face-list");
-  list.innerHTML = state.mesh.faces.map((face) => {
+  $("face-list").innerHTML = state.mesh.faces.map((face) => {
     const on = face.id === state.selectedFace ? "active" : "";
     const omitted = face.omit ? "omitted" : "";
-    return `<button class="${on} ${omitted}" data-face="${face.id}">Face ${face.id}${face.omit ? " · omit" : ""}</button>`;
+    const pinned = face.media ? " · media" : "";
+    return `<button class="${on} ${omitted}" data-face="${face.id}">Face ${face.id}${face.omit ? " · omit" : ""}${pinned}</button>`;
   }).join("");
   $("graph").innerHTML = [
     ...state.graph.objects.map((o) => `<div><code>${o.type}</code> ${o.name}${o.file ? ` · ${o.file}` : ""}</div>`),
     ...state.graph.links.map((l) => `<div class="link">${l.from} → ${l.to}</div>`),
-  ].join("") || "<div class='muted'>Starter grid graph (mesh → object → warp → window)</div>";
+  ].join("") || "<div class='muted'>mesh → object → warp → window</div>";
+  syncAnimControls();
 }
 
 function setMode(mode) {
@@ -203,7 +296,19 @@ async function loadMeshText(text, label) {
   toast(`Loaded ${state.mesh.faces.length} faces from ${label}`);
 }
 
+function setMedia(el, label) {
+  if (state.flags.mediaTarget === "face" && state.mesh.faces[state.selectedFace]) {
+    state.mesh.faces[state.selectedFace].media = el;
+    toast(`Media pinned to face ${state.selectedFace}`);
+  } else {
+    state.mediaEl = el;
+    toast(label);
+  }
+  refreshFaces();
+}
+
 async function bootMesh() {
+  state.mediaEl = makeTestPattern();
   state.mesh = await loadObj("./samples/grid_wall.obj");
   state.selectedFace = 0;
   state.graph = {
@@ -222,25 +327,33 @@ async function bootMesh() {
   refreshFaces();
 }
 
-function ingestFiles(fileList) {
+async function ingestFiles(fileList) {
   const files = [...fileList];
+  const jsons = files.filter((f) => f.name.toLowerCase().endsWith(".json"));
+  const objs = files.filter((f) => f.name.toLowerCase().endsWith(".obj"));
+  for (const file of jsons) {
+    try {
+      const project = await loadSplashJson(file);
+      state.warp = project.warp;
+      state.flags.invertChannels = project.invertChannels;
+      state.flags.blackLevel = project.blackLevel;
+      state.graph = { objects: project.objects, links: project.links };
+      $("black-level").value = Math.round(state.flags.blackLevel * 255);
+      $("invert-ch").checked = !!state.flags.invertChannels;
+      refreshFaces();
+      const wanted = basename(project.meshFile);
+      const mesh = objs.find((f) => f.name === wanted) || objs[0];
+      if (mesh) await loadMeshText(await mesh.text(), mesh.name);
+      else toast(`Graph loaded. Drop ${wanted || "the OBJ"} to get faces.`);
+    } catch (err) {
+      toast(`Could not read Splash JSON: ${err.message}`);
+    }
+  }
+  if (!jsons.length) {
+    for (const file of objs) await loadMeshText(await file.text(), file.name);
+  }
   for (const file of files) {
-    const name = file.name.toLowerCase();
-    if (name.endsWith(".json")) {
-      loadSplashJson(file).then(async (project) => {
-        state.warp = project.warp;
-        state.flags.invertMask = project.invertChannels;
-        state.flags.blackLevel = project.blackLevel;
-        state.graph = { objects: project.objects, links: project.links };
-        $("black-level").value = Math.round(state.flags.blackLevel * 255);
-        refreshFaces();
-        toast(`Splash graph: ${project.objects.length} nodes, ${project.links.length} links`);
-        const mesh = files.find((f) => f.name.toLowerCase().endsWith(".obj"));
-        if (mesh) loadMeshText(await mesh.text(), mesh.name);
-      }).catch((err) => toast(`Could not read Splash JSON: ${err.message}`));
-    } else if (name.endsWith(".obj")) {
-      file.text().then((text) => loadMeshText(text, file.name));
-    } else if (file.type.startsWith("image/") || file.type.startsWith("video/")) {
+    if (file.type.startsWith("image/") || file.type.startsWith("video/")) {
       const url = URL.createObjectURL(file);
       if (file.type.startsWith("video/")) {
         const video = document.createElement("video");
@@ -249,13 +362,12 @@ function ingestFiles(fileList) {
         video.loop = true;
         video.playsInline = true;
         video.play();
-        state.mediaEl = video;
+        setMedia(video, "Video on object");
       } else {
         const img = new Image();
         img.src = url;
-        state.mediaEl = img;
+        img.onload = () => setMedia(img, "Image on object");
       }
-      toast(`Media assigned to the object / faces`);
     }
   }
 }
@@ -264,24 +376,34 @@ function paintMask(event, erase) {
   const r = overlay.getBoundingClientRect();
   const x = ((event.clientX - r.left) / r.width) * maskCanvas.width;
   const y = ((event.clientY - r.top) / r.height) * maskCanvas.height;
-  mctx.fillStyle = erase ? "#fff" : "#000";
+  const rad = 34;
+  const grad = mctx.createRadialGradient(x, y, 2, x, y, rad);
+  if (erase) {
+    grad.addColorStop(0, "rgba(255,255,255,1)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+  } else {
+    grad.addColorStop(0, "rgba(0,0,0,1)");
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+  }
+  mctx.globalCompositeOperation = "source-over";
+  mctx.fillStyle = grad;
   mctx.beginPath();
-  mctx.arc(x, y, 28, 0, Math.PI * 2);
+  mctx.arc(x, y, rad, 0, Math.PI * 2);
   mctx.fill();
 }
 
 function onPointerDown(event) {
   overlay.setPointerCapture(event.pointerId);
   pointers.set(event.pointerId, event);
-  const [nx, ny] = ndcFromEvent(event);
   if (state.mode === "mask") {
     drag = { kind: "mask", erase: event.shiftKey || event.altKey };
     paintMask(event, drag.erase);
     return;
   }
-  const handle = hitDestCorner(nx, ny);
+  const handle = hitHandle(event);
   if (handle) {
-    drag = { ...handle, x: nx, y: ny };
+    snapshot();
+    drag = { ...handle, ...ndcNamed(event) };
     return;
   }
   if (state.mode === "geometry") {
@@ -291,9 +413,16 @@ function onPointerDown(event) {
       refreshFaces();
     }
     drag = { kind: "orbit", x: event.clientX, y: event.clientY, yaw: state.camera.yaw, pitch: state.camera.pitch };
-  } else if (state.selectedFace >= 0) {
+  } else if (state.mode === "warp" && state.selectedFace >= 0) {
+    snapshot();
+    const [nx, ny] = ndcFromEvent(event);
     drag = { kind: "move-face", x: nx, y: ny };
   }
+}
+
+function ndcNamed(event) {
+  const [x, y] = ndcFromEvent(event);
+  return { x, y };
 }
 
 function onPointerMove(event) {
@@ -302,6 +431,7 @@ function onPointerMove(event) {
     const pts = [...pointers.values()];
     const d0 = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
     if (!drag || drag.kind !== "pinch") {
+      snapshot();
       drag = { kind: "pinch", dist: d0, dest: state.mesh.faces[state.selectedFace].dest.map((p) => [...p]) };
     } else {
       const scale = d0 / Math.max(8, drag.dist);
@@ -309,6 +439,7 @@ function onPointerMove(event) {
       const cx = drag.dest.reduce((s, p) => s + p[0], 0) / drag.dest.length;
       const cy = drag.dest.reduce((s, p) => s + p[1], 0) / drag.dest.length;
       face.dest = drag.dest.map(([x, y]) => [cx + (x - cx) * scale, cy + (y - cy) * scale]);
+      syncFaceDest(face);
     }
     return;
   }
@@ -318,15 +449,16 @@ function onPointerMove(event) {
   else if (drag.kind === "orbit") {
     state.camera.yaw = drag.yaw + (event.clientX - drag.x) * 0.01;
     state.camera.pitch = Math.max(-1.2, Math.min(1.2, drag.pitch + (event.clientY - drag.y) * 0.01));
-  } else if (drag.kind === "warp") {
-    state.warp.points[drag.index] = [nx, ny];
-  } else if (drag.kind === "dest") {
-    state.mesh.faces[drag.face].dest[drag.index] = [nx, ny];
+  } else if (drag.kind === "warp") state.warp.points[drag.index] = [nx, ny];
+  else if (drag.kind === "dest") {
+    const dest = inverseWarp(state.warp, nx, ny);
+    setFaceDest(state.mesh.faces[drag.face], drag.index, dest);
   } else if (drag.kind === "move-face" && state.selectedFace >= 0) {
     const face = state.mesh.faces[state.selectedFace];
-    const dx = nx - drag.x;
-    const dy = ny - drag.y;
-    face.dest = face.dest.map(([x, y]) => [x + dx, y + dy]);
+    const from = inverseWarp(state.warp, drag.x, drag.y);
+    const to = inverseWarp(state.warp, nx, ny);
+    face.dest = face.dest.map(([x, y]) => [x + to[0] - from[0], y + to[1] - from[1]]);
+    syncFaceDest(face);
     drag.x = nx;
     drag.y = ny;
   }
@@ -359,6 +491,15 @@ function tick(now) {
   requestAnimationFrame(tick);
 }
 
+function exportProject() {
+  const blob = new Blob([JSON.stringify(toSplashJson(state), null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "splash-canvas.json";
+  a.click();
+  toast("Exported Splash-style JSON (warp + filter + links)");
+}
+
 function bind() {
   overlay.addEventListener("pointerdown", onPointerDown);
   overlay.addEventListener("pointermove", onPointerMove);
@@ -381,24 +522,19 @@ function bind() {
   $("omit-face").addEventListener("click", () => {
     const face = state.mesh.faces[state.selectedFace];
     if (!face) return;
+    snapshot();
     face.omit = !face.omit;
     refreshFaces();
   });
-  $("omit-black").addEventListener("change", (event) => {
-    state.flags.omitBlack = Number(event.target.value);
-  });
-  $("invert-mask").addEventListener("change", (event) => {
-    state.flags.invertMask = event.target.checked;
-  });
-  $("invert-faces").addEventListener("change", (event) => {
-    state.flags.invertFaces = event.target.checked;
-  });
-  $("threshold").addEventListener("input", (event) => {
-    state.flags.threshold = Number(event.target.value) / 100;
-  });
-  $("black-level").addEventListener("input", (event) => {
-    state.flags.blackLevel = Number(event.target.value) / 255;
-  });
+  $("omit-black").addEventListener("change", (event) => { state.flags.omitBlack = Number(event.target.value); });
+  $("invert-mask").addEventListener("change", (event) => { state.flags.invertMask = event.target.checked; });
+  $("invert-faces").addEventListener("change", (event) => { state.flags.invertFaces = event.target.checked; });
+  $("invert-ch").addEventListener("change", (event) => { state.flags.invertChannels = event.target.checked; });
+  $("flip").addEventListener("change", (event) => { state.flags.flip = event.target.checked; });
+  $("flop").addEventListener("change", (event) => { state.flags.flop = event.target.checked; });
+  $("media-target").addEventListener("change", (event) => { state.flags.mediaTarget = event.target.value; });
+  $("threshold").addEventListener("input", (event) => { state.flags.threshold = Number(event.target.value) / 100; });
+  $("black-level").addEventListener("input", (event) => { state.flags.blackLevel = Number(event.target.value) / 255; });
   $("anim-dir").addEventListener("change", (event) => {
     const face = state.mesh.faces[state.selectedFace];
     if (!face) return;
@@ -412,15 +548,31 @@ function bind() {
     const face = state.mesh.faces[state.selectedFace];
     if (face) face.anim.speed = Number(event.target.value) / 100;
   });
+  $("anim-all").addEventListener("click", () => {
+    const src = state.mesh.faces[state.selectedFace];
+    if (!src) return;
+    snapshot();
+    for (const face of state.mesh.faces) {
+      face.anim = { ...src.anim };
+    }
+    toast("Animation copied to every face");
+  });
   $("clear-mask").addEventListener("click", () => {
+    snapshot();
     mctx.fillStyle = "#fff";
     mctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
   });
   $("reset-warp").addEventListener("click", () => {
+    snapshot();
     state.warp = identityWarp();
   });
+  $("test-pattern").addEventListener("click", () => setMedia(makeTestPattern(), "UV test pattern on object"));
+  $("undo").addEventListener("click", undo);
+  $("export-json").addEventListener("click", exportProject);
   $("pick-files").addEventListener("click", () => $("files").click());
+  $("pick-folder").addEventListener("click", () => $("folder").click());
   $("files").addEventListener("change", (event) => ingestFiles(event.target.files));
+  $("folder").addEventListener("change", (event) => ingestFiles(event.target.files));
   $("fullscreen").addEventListener("click", () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else document.documentElement.requestFullscreen?.();
@@ -432,11 +584,24 @@ function bind() {
   });
   window.addEventListener("keydown", (event) => {
     if (event.target.matches("input, select, textarea")) return;
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+      event.preventDefault();
+      undo();
+      return;
+    }
+    if (event.key === "Escape") {
+      if (state.mode === "present") setMode("geometry");
+      else {
+        const off = document.body.dataset.chrome === "off";
+        document.body.dataset.chrome = off ? "on" : "off";
+      }
+    }
     if (event.key === "1") setMode("geometry");
     if (event.key === "2") setMode("warp");
     if (event.key === "3") setMode("mask");
     if (event.key === "4" || event.key === "f" || event.key === "F") setMode("present");
     if (event.key === "o" && state.mesh.faces[state.selectedFace]) {
+      snapshot();
       state.mesh.faces[state.selectedFace].omit = !state.mesh.faces[state.selectedFace].omit;
       refreshFaces();
     }
@@ -448,6 +613,7 @@ async function main() {
   await bootMesh();
   bind();
   setMode("geometry");
+  toast("UV test pattern on 8×6 grid — Warp tab to place a section");
   requestAnimationFrame(tick);
 }
 

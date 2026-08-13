@@ -43,6 +43,17 @@ Blender export (`tests/data/sample_blender_scene.json`) is the same idea with mu
 | `warp.patchControl` | 4×4 (default) bezier control points in NDC `[-1, 1]` — drag a sectional grid onto a real surface |
 | Second texture / mask mix in the object shader | Overlay another image using its alpha |
 
+## Correctness notes (what this canvas implements)
+
+- **Warp** uses the same Bernstein / binomial evaluation as Splash `Mesh_BezierPatch` (`src/mesh/mesh_bezierpatch.cpp`). Dest vertices are warped on the CPU so any patch size works, not only 4×4 in a shader.
+- **invertChannels** swaps red and blue (`color.rgb = color.bgr`), matching Splash’s filter shader — it is not `1.0 - rgb`.
+- **blackLevel** is 0–255 in JSON, then `color.rgb * (1 - bl) + bl` with `bl` in 0–1.
+- **OBJ** supports negative indices, n-gon fan triangulation, and UV-derived dest quads. Vertices are normalized to a ~1.7 fit so Blender exports are visible.
+- Dest handles in the Warp tab are dragged in screen space and **inverse-warped** back into dest NDC, so the gold quad stays on the image while the white grid is `patchControl`.
+- Geometry tab shows the 3D mesh (orbit / pick). Warp / Mask / Present show the output mapping.
+
+NVIDIA camera-calibration skills (AMC, NGC) can help a full projector-calibration stack later. They are not required here and are not installed; this studio stays on Splash JSON + OBJ + WebGL.
+
 ## The abilities you asked for
 
 **Grid pattern**  
@@ -57,7 +68,7 @@ Click a face, drop media, pinch with two pointers to scale that section, drag it
 - Painted mask: black = hole. Invert mask to flip keep/omit. Shift-drag restores.
 
 **Move a sectional thing onto a surface**  
-Warp tab = Splash `patchControl`. Drag white points (bezier patch) or a face’s gold quad.
+Warp tab = Splash `patchControl`. Drag white points (Bernstein patch) or a face’s gold dest quad (inverse-warped so it tracks the image).
 
 **Animations moving one way or the other**  
 Per face: U→ U← V↑ V↓ UV pan, same idea as sliding texture coordinates on a Splash object (Blender can also stream live meshes).

@@ -113,3 +113,34 @@ export async function loadSplashJson(file) {
   const text = await file.text();
   return splashToProject(parseJsonc(text));
 }
+
+export function basename(path) {
+  return String(path || "").split(/[/\\]/).pop();
+}
+
+export function toSplashJson(state) {
+  const [cols, rows] = state.warp.patchSize;
+  const patchControl = [cols, rows, ...state.warp.points.map((p) => [p[0], p[1]])];
+  return {
+    description: "splashConfiguration",
+    version: "web-canvas",
+    world: { framerate: 60 },
+    scenes: {
+      local: {
+        links: (state.graph.links || []).map((l) => [l.from, l.to]),
+        objects: {
+          mesh: { type: "mesh", file: [state.graph.objects?.find((o) => o.type === "mesh")?.file || "mesh.obj"] },
+          object: { type: "object" },
+          image: { type: "image", flip: [!!state.flags.flip], flop: [!!state.flags.flop] },
+          object_image_filter: {
+            type: "filter",
+            invertChannels: [!!state.flags.invertChannels],
+            blackLevel: [Math.round((state.flags.blackLevel || 0) * 255)],
+          },
+          warp: { type: "warp", patchSize: [cols, rows], patchControl },
+          window: { type: "window" },
+        },
+      },
+    },
+  };
+}
