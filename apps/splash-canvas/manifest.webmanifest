@@ -1,0 +1,9 @@
+{
+  "name": "Splash Canvas",
+  "short_name": "Splash",
+  "display": "fullscreen",
+  "background_color": "#0b0c10",
+  "theme_color": "#0b0c10",
+  "start_url": "./index.html",
+  "description": "Local Splash mapping studio: UV faces, Bernstein warp, Splash filters, undo, and JSON export. No API key."
+}
