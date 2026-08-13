@@ -5,12 +5,13 @@ import { createRenderer } from "./render.js";
 import { makeTestPattern } from "./pattern.js";
 import { makeShape, SHAPES } from "./shapes.js";
 import { makeSpooky } from "./spooky.js";
-import { IDEAS, riffFrom, riffFromText, surprise } from "./ideas.js";
+import { IDEAS, FEATURED_IDS, riffFrom, riffFromText, surprise, ideaCount } from "./ideas.js";
+import { createMotion, MOTION_KINDS } from "./motion.js";
 
 const $ = (id) => document.getElementById(id);
 
 const HINTS = {
-  geometry: "Click a shape, then drop a photo. Drag to orbit. Open Place to put it on a wall.",
+  geometry: "The Matrix is live. Place it on a wall, or open Ideas for 200+ motions. M replays the rain.",
   warp: "Drag gold corners to place this face. White points warp the whole output. Scroll to scale.",
   mask: "Paint to hide pixels. Shift-drag restores. Clear mask if you go too far.",
   present: "",
@@ -36,6 +37,9 @@ const state = {
     blackLevel: 0,
     showGrid: true,
     mediaTarget: "all",
+    kaleido: 0,
+    spin: 0,
+    spinSpeed: 0,
   },
 };
 
@@ -55,6 +59,9 @@ let renderer;
 let drag = null;
 let pointers = new Map();
 let last = performance.now();
+let motion = null;
+let ideaFilter = "featured";
+let ideaQuery = "";
 
 function toast(message) {
   const el = $("toast");
@@ -320,6 +327,10 @@ function refreshFaces() {
     else dir.value = "off";
     speed.value = Math.round((face.anim.speed || 0) * 100);
   }
+  if ($("kaleido")) $("kaleido").value = String(state.flags.kaleido || 0);
+  if ($("spin")) $("spin").value = String(Math.round((state.flags.spinSpeed || 0) * 100));
+  if ($("live-look")) $("live-look").value = motion?.kind || "";
+  document.body.dataset.motion = motion?.kind || "";
   for (const btn of document.querySelectorAll("[data-shape]")) {
     btn.classList.toggle("active", btn.dataset.shape === state.shapeId);
   }
@@ -367,15 +378,40 @@ function applyShape(id) {
   useMesh(spec.make(), spec.id, `${spec.label} ready — drop a photo, then open Place`);
 }
 
+function stopMotion() {
+  motion?.stop?.();
+  motion = null;
+  document.body.dataset.motion = "";
+}
+
+function playMotion(kind, message) {
+  if (!kind) {
+    stopMotion();
+    return;
+  }
+  stopMotion();
+  motion = createMotion(kind);
+  motion.tick(performance.now());
+  state.mediaEl = motion.canvas;
+  if ($("live-look")) $("live-look").value = kind;
+  document.body.dataset.motion = kind;
+  if (message) toast(message);
+}
+
 function applyLook(idea) {
   state.flags.omitBlack = idea.omitBlack ?? 0;
   state.flags.invertChannels = !!idea.invertCh;
+  state.flags.kaleido = idea.kaleido || 0;
+  state.flags.spinSpeed = idea.spin || 0;
+  state.flags.spin = 0;
   const anim = idea.anim || { dirU: 0, dirV: 0, speed: 0 };
   for (const face of state.mesh.faces) {
     face.anim = { u: 0, v: 0, speed: anim.speed || 0, dirU: anim.dirU || 0, dirV: anim.dirV || 0 };
   }
   if ($("omit-black")) $("omit-black").value = String(state.flags.omitBlack);
   if ($("invert-ch")) $("invert-ch").checked = !!state.flags.invertChannels;
+  if ($("kaleido")) $("kaleido").value = String(state.flags.kaleido || 0);
+  if ($("spin")) $("spin").value = String(Math.round((state.flags.spinSpeed || 0) * 100));
 }
 
 function applyIdea(idea) {
@@ -384,7 +420,11 @@ function applyIdea(idea) {
   const spec = SHAPES.find((s) => s.id === idea.shape) || SHAPES[0];
   useMesh(spec.make(), spec.id);
   applyLook(idea);
-  state.mediaEl = makeSpooky(idea.pattern);
+  if (idea.motion) playMotion(idea.motion);
+  else {
+    stopMotion();
+    state.mediaEl = makeSpooky(idea.pattern);
+  }
   refreshFaces();
   if ($("idea-seed")) $("idea-seed").value = idea.title;
   toast(idea.how);
@@ -395,10 +435,13 @@ function esc(s) {
 }
 
 function ideaCard(idea) {
-  return `<article class="idea-card" data-idea="${esc(idea.id)}">
+  const live = idea.live || idea.motion ? "live" : "";
+  const tag = idea.motion || idea.family || "idea";
+  return `<article class="idea-card ${live}" data-idea="${esc(idea.id)}">
+    <p class="idea-tag">${esc(tag)}${idea.kaleido ? " · kaleido " + idea.kaleido : ""}</p>
     <h3>${esc(idea.title)}</h3>
     <p>${esc(idea.how)}</p>
-    <p>Shape <code>${esc(idea.shape)}</code> · drop <code>${esc(idea.files)}</code></p>
+    <p>Shape <code>${esc(idea.shape)}</code> · ${esc(idea.files)}</p>
     <div class="row">
       <button type="button" data-use="${esc(idea.id)}">Use</button>
       <button type="button" class="ghost" data-riff="${esc(idea.id)}">Riff this</button>
@@ -408,11 +451,31 @@ function ideaCard(idea) {
 
 const riffs = [];
 
+function ideaMatches(idea) {
+  const q = ideaQuery.trim().toLowerCase();
+  if (ideaFilter === "featured" && !FEATURED_IDS.has(idea.id)) return false;
+  if (ideaFilter === "matrix" && idea.motion !== "matrix" && idea.family !== "matrix") return false;
+  if (ideaFilter === "kaleido" && idea.family !== "kaleido" && !(idea.kaleido > 1) && idea.motion !== "kaleido") return false;
+  if (ideaFilter === "video" && idea.family !== "video") return false;
+  if (ideaFilter === "halloween" && idea.family !== "halloween") return false;
+  if (ideaFilter === "live" && !idea.live && !idea.motion) return false;
+  if (q && !`${idea.title} ${idea.how} ${idea.where} ${idea.haunt} ${idea.motion}`.toLowerCase().includes(q)) return false;
+  return true;
+}
+
 function renderIdeas() {
   const list = $("idea-list");
   const extra = $("idea-riffs");
-  if (list) list.innerHTML = IDEAS.map(ideaCard).join("");
+  const counts = ideaCount();
+  const shown = IDEAS.filter(ideaMatches);
+  if ($("idea-count")) {
+    $("idea-count").textContent = `${shown.length} showing · ${counts.motion} motion ideas · ${counts.featured} featured · ${counts.halloween} Halloween`;
+  }
+  if (list) list.innerHTML = shown.map(ideaCard).join("");
   if (extra) extra.innerHTML = riffs.length ? riffs.map(ideaCard).join("") : "<p class='muted'>Type a spark above, or riff any starter.</p>";
+  document.querySelectorAll("[data-idea-filter]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.ideaFilter === ideaFilter);
+  });
 }
 
 function findIdea(id) {
@@ -448,6 +511,7 @@ async function loadMeshText(text, label) {
 }
 
 function setMedia(el, label) {
+  stopMotion();
   if (state.flags.mediaTarget === "face" && state.mesh.faces[state.selectedFace]) {
     state.mesh.faces[state.selectedFace].media = el;
     toast(`Media on ${state.mesh.faces[state.selectedFace].name || "this face"}`);
@@ -672,6 +736,10 @@ function onPointerUp(event) {
 function tick(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  motion?.tick(now);
+  if (state.flags.spinSpeed) {
+    state.flags.spin = (state.flags.spin || 0) + state.flags.spinSpeed * dt;
+  }
   for (const face of state.mesh.faces) {
     if (!face.anim.speed) continue;
     face.anim.u = (face.anim.u + face.anim.speed * (face.anim.dirU || 0) * dt) % 1;
@@ -771,6 +839,23 @@ function bind() {
     for (const face of state.mesh.faces) face.anim = { ...src.anim };
     toast("Motion copied to every face");
   });
+  $("kaleido")?.addEventListener("input", (event) => {
+    state.flags.kaleido = Number(event.target.value);
+  });
+  $("spin")?.addEventListener("input", (event) => {
+    state.flags.spinSpeed = Number(event.target.value) / 100;
+  });
+  $("live-look")?.addEventListener("change", (event) => {
+    const kind = event.target.value;
+    if (!kind) {
+      stopMotion();
+      state.mediaEl = makeTestPattern();
+      toast("Live look off");
+      return;
+    }
+    playMotion(kind, `${MOTION_KINDS.find((k) => k.id === kind)?.label || kind} is live`);
+  });
+  $("play-matrix")?.addEventListener("click", () => applyIdea(IDEAS[0]));
   $("clear-mask")?.addEventListener("click", () => {
     snapshot();
     mctx.fillStyle = "#fff";
@@ -790,6 +875,16 @@ function bind() {
     addRiff(text.trim() ? riffFromText(text) : riffFrom(source, "again"));
   });
   $("idea-surprise")?.addEventListener("click", () => addRiff(surprise()));
+  $("idea-search")?.addEventListener("input", (event) => {
+    ideaQuery = event.target.value || "";
+    renderIdeas();
+  });
+  $("idea-filters")?.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-idea-filter]");
+    if (!btn) return;
+    ideaFilter = btn.dataset.ideaFilter;
+    renderIdeas();
+  });
   $("ideas")?.addEventListener("click", (event) => {
     const use = event.target.dataset?.use;
     const riff = event.target.dataset?.riff;
@@ -839,6 +934,8 @@ function bind() {
       }
     }
     if ((event.key === "i" || event.key === "I") && state.mode !== "present") openIdeas();
+    if ((event.key === "m" || event.key === "M") && state.mode !== "present") applyIdea(IDEAS[0]);
+    if (event.key === "1") setMode("geometry");
     if (event.key === "2") setMode("warp");
     if (event.key === "3") setMode("mask");
     if (event.key === "4" || event.key === "f" || event.key === "F") setMode("present");
@@ -854,12 +951,20 @@ function bind() {
 
 async function main() {
   renderer = createRenderer(canvas);
-  state.mediaEl = makeTestPattern();
-  useMesh(makeShape("quad"), "quad");
+  const liveSel = $("live-look");
+  if (liveSel) {
+    for (const kind of MOTION_KINDS) {
+      const opt = document.createElement("option");
+      opt.value = kind.id;
+      opt.textContent = kind.label;
+      liveSel.append(opt);
+    }
+  }
+  useMesh(makeShape("screen"), "screen");
   bind();
   renderIdeas();
   setMode("geometry");
-  toast("Quad ready — drop a photo, or pick another shape");
+  applyIdea(IDEAS[0]);
   requestAnimationFrame(tick);
 }
 

@@ -154,7 +154,21 @@ code { color: var(--gold); }
   z-index: 30;
 }
 
+#play-matrix { color: #7CFF6B; }
 #ideas-open { color: var(--gold); }
+body[data-motion="matrix"] #play-matrix { background: rgba(124, 255, 107, 0.14); }
+
+.idea-tag {
+  margin: 0 0 4px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.idea-card.live { border-color: rgba(124, 255, 107, 0.28); }
+.idea-card.live .idea-tag { color: #7CFF6B; }
+#idea-filters button { font-size: 12px; padding: 6px 10px; }
+#ideas { width: min(440px, 94vw); }
 
 input[type="text"] {
   font: inherit;

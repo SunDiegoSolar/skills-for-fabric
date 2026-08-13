@@ -9,8 +9,8 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=6" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css?v=7" />
 </head>
 <body data-mode="geometry" data-shape="quad">
   <header id="chrome">
@@ -22,6 +22,7 @@
       <button type="button" data-mode="present">Present</button>
     </nav>
     <div class="right">
+      <button type="button" id="play-matrix">Matrix</button>
       <button type="button" id="ideas-open">Ideas</button>
       <button type="button" id="pick-media">Drop media</button>
       <button type="button" class="ghost" id="undo">Undo</button>
@@ -129,6 +130,13 @@
       </div>
 
       <h2>Motion</h2>
+      <label>Live look
+        <select id="live-look">
+          <option value="">Off (photo / video)</option>
+        </select>
+      </label>
+      <label>Kaleido slices <input id="kaleido" type="range" min="0" max="16" value="0" /></label>
+      <label>Spin <input id="spin" type="range" min="0" max="40" value="0" /></label>
       <label>Direction
         <select id="anim-dir">
           <option value="off">Off</option>
@@ -142,7 +150,7 @@
       <div class="row">
         <button type="button" class="ghost" id="anim-all">Apply to all faces</button>
       </div>
-      <p class="muted">1 Look · 2 Place · 3 Mask · 4 Present · O hide face · D duplicate · Delete remove · Ctrl/Cmd+Z undo</p>
+      <p class="muted">1 Look · 2 Place · 3 Mask · 4 Present · M Matrix · I Ideas · O hide face · D duplicate · Delete remove · Ctrl/Cmd+Z undo</p>
     </aside>
   </main>
 
@@ -153,24 +161,36 @@
 
   <aside id="ideas" hidden>
     <div class="ideas-head">
-      <h2>Halloween ideas</h2>
+      <h2>Motion ideas</h2>
       <button type="button" class="ghost" id="ideas-close">Close</button>
     </div>
-    <p class="muted">Click <strong>Use</strong> to load a shape + spooky look. Type a spark and <strong>Riff</strong> to grow a new idea from it.</p>
-    <label class="idea-seed-label">Grow from this
-      <input id="idea-seed" type="text" placeholder="haunted porch window, bats in the garage…" />
+    <p class="muted">The Matrix is live. <strong>Use</strong> loads a shape + moving look. Kaleido slices fold any photo or video. Type a spark and <strong>Riff</strong>.</p>
+    <p class="muted" id="idea-count"></p>
+    <div id="idea-filters" class="row">
+      <button type="button" data-idea-filter="featured" class="active">Featured</button>
+      <button type="button" class="ghost" data-idea-filter="all">All</button>
+      <button type="button" class="ghost" data-idea-filter="matrix">Matrix</button>
+      <button type="button" class="ghost" data-idea-filter="kaleido">Kaleido</button>
+      <button type="button" class="ghost" data-idea-filter="video">Video</button>
+      <button type="button" class="ghost" data-idea-filter="halloween">Halloween</button>
+    </div>
+    <label class="idea-seed-label">Search / grow from this
+      <input id="idea-search" type="text" placeholder="matrix, kaleidoscope, ocean, garage…" />
+    </label>
+    <label class="idea-seed-label">Riff spark
+      <input id="idea-seed" type="text" placeholder="bats in the garage, code on the door…" />
     </label>
     <div class="row">
       <button type="button" id="idea-riff">Riff from this</button>
       <button type="button" class="ghost" id="idea-surprise">Surprise me</button>
     </div>
-    <p class="muted" id="idea-files">Files that drop in cleanly: PNG/JPEG/WebP/GIF (black backgrounds + Omit black), MP4/WebM loops, UV-mapped OBJ, splash.json + that OBJ. Built-in patterns need no files.</p>
+    <p class="muted" id="idea-files">Live looks need no files. Videos still drop in: MP4/WebM loops, PNG with Omit black, UV-mapped OBJ, splash.json + that OBJ.</p>
     <h2>From your riff</h2>
     <div id="idea-riffs"></div>
-    <h2>Twenty starters</h2>
+    <h2>Catalog</h2>
     <div id="idea-list"></div>
   </aside>
 
-  <script type="module" src="./js/app.js?v=6"></script>
+  <script type="module" src="./js/app.js?v=7"></script>
 </body>
 </html>

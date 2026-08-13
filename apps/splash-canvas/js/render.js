@@ -35,9 +35,25 @@ uniform int uWire;
 uniform int uInvertCh;
 uniform int uFlip;
 uniform int uFlop;
+uniform int uKaleido;
+uniform float uSpin;
 out vec4 frag;
 void main() {
-  vec2 uv = fract(vUv);
+  vec2 uv = vUv - 0.5;
+  if (uSpin != 0.0) {
+    float c = cos(uSpin);
+    float s = sin(uSpin);
+    uv = vec2(c * uv.x - s * uv.y, s * uv.x + c * uv.y);
+  }
+  if (uKaleido > 1) {
+    float a = atan(uv.y, uv.x);
+    float r = length(uv);
+    float seg = 6.28318530718 / float(uKaleido);
+    a = mod(a + 3.14159265, seg);
+    a = abs(a - seg * 0.5);
+    uv = vec2(cos(a), sin(a)) * r;
+  }
+  uv = fract(uv + 0.5);
   if (uFlip == 1) uv.x = 1.0 - uv.x;
   if (uFlop == 1) uv.y = 1.0 - uv.y;
   vec4 color = uHasMedia == 1 ? texture(uMedia, uv) : vec4(uTint, 1.0);
@@ -107,19 +123,18 @@ export function createRenderer(canvas) {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([40, 42, 50, 255]));
   }
 
+  function isLiveSource(source) {
+    if (!source) return false;
+    if (source instanceof HTMLVideoElement) return true;
+    if (source instanceof HTMLCanvasElement) return true;
+    if (typeof OffscreenCanvas !== "undefined" && source instanceof OffscreenCanvas) return true;
+    return false;
+  }
+
   function setTexture(tex, source) {
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
-    const isCanvas = source instanceof HTMLCanvasElement
-      || (typeof OffscreenCanvas !== "undefined" && source instanceof OffscreenCanvas);
-    if (isCanvas) {
-      const ctx2d = source.getContext("2d");
-      if (ctx2d) {
-        const img = ctx2d.getImageData(0, 0, source.width, source.height);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, img.width, img.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img.data);
-        return;
-      }
-    }
+    if (source instanceof HTMLVideoElement && source.readyState < 2) return;
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
   }
 
@@ -164,6 +179,8 @@ export function createRenderer(canvas) {
     gl.uniform1i(loc("uInvertCh"), flags.invertChannels ? 1 : 0);
     gl.uniform1i(loc("uFlip"), flags.flip ? 1 : 0);
     gl.uniform1i(loc("uFlop"), flags.flop ? 1 : 0);
+    gl.uniform1i(loc("uKaleido"), flags.kaleido || 0);
+    gl.uniform1f(loc("uSpin"), flags.spin || 0);
     gl.uniform2f(loc("uMaskSize"), canvas.width, canvas.height);
     gl.uniform1i(loc("uWire"), 0);
 
@@ -188,7 +205,7 @@ export function createRenderer(canvas) {
       if (!face.omit && flags.invertFaces) continue;
       const source = face.media || media;
       gl.uniform1i(loc("uHasMedia"), source ? 1 : 0);
-      if (source && source !== boundMedia) {
+      if (source && (source !== boundMedia || isLiveSource(source))) {
         gl.activeTexture(gl.TEXTURE0);
         setTexture(mediaTex, source);
         gl.uniform1i(loc("uMedia"), 0);
