@@ -35,6 +35,7 @@ python3 python/splash_project.py /Users/javierthephotoguy/Downloads/splash-maste
 | Animation left/right/up/down | Select a face → Animation U/V, or copy motion to every face |
 | Undo / export | Ctrl/Cmd+Z, **Export JSON** (Splash-style graph) |
 | Folder ingest | **Open folder** or drop `splash.json` + matching `*.obj` + media |
+| Log in | Click **Log in** — the panel opens. Local session on this machine; with `./start.sh` the same form can use a server cookie. Optional `SPLASH_USER` / `SPLASH_PASSWORD`, or `SPLASH_REQUIRE_LOGIN=1`. Dedicated page: http://127.0.0.1:8765/login.html |
 
 Keys: `1` geometry · `2` warp · `3` mask · `4` / `F` present · `O` omit face · `Esc` hide chrome · Ctrl/Cmd+Z undo.
 

@@ -23,6 +23,7 @@ __pycache__/
 # Local config
 .env
 .env.local
+apps/splash-canvas/.data/
 
 # Eval test results -- individual per-skill detail files
 # Only the merged summary (eval-results.md) and regression_analysis.md are tracked

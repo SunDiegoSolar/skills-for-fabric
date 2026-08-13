@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=3" />
+  <link rel="stylesheet" href="./styles.css?v=4" />
 </head>
 <body data-mode="geometry">
   <header id="chrome">
@@ -22,6 +22,8 @@
       <button type="button" data-mode="present">Present</button>
     </nav>
     <div class="right">
+      <button type="button" id="login-open">Log in</button>
+      <span id="login-user" hidden></span>
       <button type="button" class="ghost" id="undo">Undo</button>
       <button type="button" class="ghost" id="export-json">Export JSON</button>
       <button type="button" id="pick-files">Open files</button>
@@ -106,6 +108,51 @@
   <input id="files" type="file" hidden multiple accept=".json,.obj,.png,.jpg,.jpeg,.webp,.gif,.mp4,.webm,.mov,image/*,video/*" />
   <input id="folder" type="file" hidden webkitdirectory directory />
   <div id="toast" hidden></div>
-  <script type="module" src="./js/app.js?v=3"></script>
+
+  <dialog id="login-dialog">
+    <h2>Log in</h2>
+    <p class="muted" id="login-mode">Opens a local session. If this app is served with ./start.sh, the same form can use a server session.</p>
+    <p id="login-error" class="login-error"></p>
+    <div id="login-signed" hidden>
+      <p id="login-signed-name"></p>
+      <div class="row">
+        <button type="button" id="login-signout">Sign out</button>
+        <button type="button" class="ghost" id="login-cancel-signed">Close</button>
+      </div>
+    </div>
+    <form id="login-form">
+      <label>Name
+        <input id="login-name" name="name" type="text" autocomplete="username" required />
+      </label>
+      <label>Password
+        <input id="login-pass" name="password" type="password" autocomplete="current-password" />
+      </label>
+      <div class="row">
+        <button type="submit" id="login-submit">Sign in</button>
+        <button type="button" class="ghost" id="login-register">Create account</button>
+      </div>
+      <div class="row">
+        <button type="button" class="ghost" id="login-guest">Continue as guest</button>
+        <button type="button" class="ghost" id="login-page">Open login page</button>
+        <button type="button" class="ghost" id="login-cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    document.addEventListener("click", (event) => {
+      const btn = event.target.closest("#login-open");
+      if (!btn) return;
+      const dialog = document.getElementById("login-dialog");
+      if (dialog && typeof dialog.showModal === "function") {
+        if (!dialog.open) dialog.showModal();
+        const name = document.getElementById("login-name");
+        if (name && !document.body.dataset.signedIn) name.focus();
+      } else {
+        window.location.href = "./login.html";
+      }
+    }, true);
+  </script>
+  <script type="module" src="./js/app.js?v=4"></script>
 </body>
 </html>

@@ -3,6 +3,7 @@ import { loadObj, parseObj, pickFace, setFaceDest, syncFaceDest } from "./obj.js
 import { basename, identityWarp, loadSplashJson, toSplashJson } from "./project.js";
 import { createRenderer } from "./render.js";
 import { makeTestPattern } from "./pattern.js";
+import { createAuth } from "./auth.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -39,6 +40,7 @@ mctx.fillStyle = "#fff";
 mctx.fillRect(0, 0, 1024, 1024);
 
 const history = [];
+const auth = createAuth({ toast });
 let renderer;
 let drag = null;
 let pointers = new Map();
@@ -501,6 +503,7 @@ function exportProject() {
 }
 
 function bind() {
+  auth.bind();
   overlay.addEventListener("pointerdown", onPointerDown);
   overlay.addEventListener("pointermove", onPointerMove);
   overlay.addEventListener("pointerup", onPointerUp);
@@ -590,6 +593,7 @@ function bind() {
       return;
     }
     if (event.key === "Escape") {
+      if ($("login-dialog")?.open) return;
       if (state.mode === "present") setMode("geometry");
       else {
         const off = document.body.dataset.chrome === "off";
