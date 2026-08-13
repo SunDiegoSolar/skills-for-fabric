@@ -54,6 +54,10 @@ Blender export (`tests/data/sample_blender_scene.json`) is the same idea with mu
 
 NVIDIA camera-calibration skills (AMC, NGC) can help a full projector-calibration stack later. They are not required here and are not installed; this studio stays on Splash JSON + OBJ + WebGL.
 
+## Premade shapes
+
+The left rail is the same idea as MadMapper (quad / triangle / circle) and HeavyM (ready-made shapes): click a primitive, drop media, warp it onto a surface. Generated in `js/shapes.js` (not GPL Splash meshes). You can still drop a UV-mapped OBJ.
+
 ## The abilities you asked for
 
 **Grid pattern**  
